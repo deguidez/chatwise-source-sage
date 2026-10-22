@@ -116,7 +116,7 @@ export function ConversationsPanel() {
     if (!current) return;
     const att = override ?? (file ? { blob: file, mimetype: file.type || "application/octet-stream", kind: kindOf(file.type), fileName: file.name } : null);
     if (!att && !text.trim()) return;
-    if (att && att.blob.size > 16 * 1024 * 1024) return toast.error("Arquivo maior que 16 MB");
+    if (att && att.blob.size > 16 * 1024 * 1024) { toast.error("Arquivo maior que 16 MB"); return; }
     setSending(true);
     try {
       const media = att ? { kind: att.kind, mimetype: att.mimetype, fileName: att.fileName, data: await fileToBase64(att.blob) } : undefined;
