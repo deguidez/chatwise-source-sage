@@ -13,6 +13,8 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Painel — Agente WhatsApp" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "description", content: "Gerencie o conhecimento, as chaves e as conversas do seu agente de IA no WhatsApp." },
       { property: "og:title", content: "Painel — Agente WhatsApp" },
       { property: "og:description", content: "Gerencie o conhecimento, as chaves e as conversas do seu agente de IA no WhatsApp." },

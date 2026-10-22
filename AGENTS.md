@@ -16,3 +16,4 @@
 - WhatsApp via Evolution or YCloud webhooks (/api/public/{evolution,ycloud}/webhook?token=…); AI provider selectable (Gemini free tier, Ollama on the VPS, OpenAI) using keys from settings, never Lovable AI (app is self-hosted).
 - Multi-company flow: menu picks a company, knowledge is filtered by companyId; handoff to Chatwoot (API inbox) when asked, menu option, or AI returns [TRANSFERIR]; AI stays silent until Chatwoot resolves the conversation (/api/public/chatwoot/webhook).
 - Pure parsing/retrieval logic lives in src/lib/agent-core.ts so it stays unit-testable.
+- Inactivity uses persisted reminder claims in store.server.ts and a managed authenticated scheduled callback at /api/public/jobs/inactivity; do not use request-lifetime timers because reminders must work with the dashboard closed. Self-hosted schedulers call the same endpoint with LOVABLE_CRON_SECRET.

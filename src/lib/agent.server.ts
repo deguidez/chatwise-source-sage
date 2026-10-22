@@ -1,8 +1,9 @@
-import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, type IncomingMessage } from "./agent-core";
+import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, wantsToCancel, type IncomingMessage } from "./agent-core";
 import {
   getConversations,
   getKnowledge,
   getSettings,
+  claimInactivityReminder,
   updateConversations,
   type ChatMessage,
   type ChatState,
@@ -162,6 +163,7 @@ async function saveChat(jid: string, fn: (c: ChatState) => void, base: ChatState
   await updateConversations((c) => {
     const chat = c.chats[jid] ?? base;
     fn(chat);
+    if (chat.messages.at(-1)?.role === "user") chat.inactivityReminderAt = undefined;
     chat.messages = chat.messages.slice(-60);
     c.chats[jid] = chat;
   });
@@ -180,6 +182,11 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 
   const base: ChatState = { name: msg.name, number: msg.number, channel, stage: "menu", messages: [] };
   const chat: ChatState = { ...base, ...convs.chats[msg.jid], name: msg.name || convs.chats[msg.jid]?.name || "" };
+  if (chat.closed) {
+    chat.closed = false;
+    chat.stage = "menu";
+    chat.companyId = undefined;
+  }
   const userMsg: ChatMessage = { role: "user", content: msg.text, at: now() };
   const reply = async (text: string) => {
     await sendWhatsApp(s, channel, msg.number, text);
@@ -187,6 +194,24 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   };
 
   const route = routeMessage(chat, msg.text, s.companies, s.humanOption);
+
+  // A cancellation answer belongs to the reminder, not to the company AI.
+  if (chat.stage !== "human" && chat.inactivityReminderAt && wantsToCancel(msg.text)) {
+    const out = await reply("Atendimento encerrado. Quando precisar, é só mandar uma mensagem. Até mais! 🙂");
+    await saveChat(msg.jid, (c) => {
+      c.messages.push(userMsg, out);
+      c.closed = true;
+      c.stage = "menu";
+      c.companyId = undefined;
+      c.inactivityReminderAt = undefined;
+    }, base);
+    return "cancelled";
+  }
+
+  await saveChat(msg.jid, (c) => {
+    c.closed = false;
+    c.inactivityReminderAt = undefined;
+  }, base);
 
   if (route.kind === "silent") {
     if (chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
@@ -217,7 +242,8 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }
 
   if (route.kind === "select") {
-    const company = s.companies.find((c) => c.id === route.companyId)!;
+    const company = s.companies.find((c) => c.id === route.companyId);
+    if (!company) return "unknown-company";
     const out = await reply(`Perfeito! Você está falando com *${company.name}*. Como posso te ajudar?\n\n_(Digite 0 para voltar ao menu)_`);
     await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "company"; c.companyId = company.id; }, base);
     return "selected";
@@ -228,6 +254,41 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   const out = await reply(answer);
   await saveChat(msg.jid, (c) => c.messages.push(userMsg, out), base);
   return "replied";
+}
+
+/** Scheduled sweep: one reminder per unanswered turn, never during a handoff. */
+export async function sendInactivityReminders(time = Date.now()) {
+  const settings = await getSettings();
+  if (!settings.enabled) return { sent: 0, failed: 0 };
+  const conversations = await getConversations();
+  let sent = 0;
+  let failed = 0;
+  for (const [jid, candidate] of Object.entries(conversations.chats)) {
+    if (!isInactivityDue(candidate, time)) continue;
+    // Bound each callback; later ticks process remaining conversations.
+    if (sent + failed >= 20) break;
+    const chat = await claimInactivityReminder(jid, time);
+    if (!chat) continue;
+    try {
+      const current = (await getConversations()).chats[jid];
+      if (!current || current.stage === "human" || current.closed || current.inactivityReminderAt !== chat.inactivityReminderAt) continue;
+      await sendWhatsApp(settings, chat.channel, chat.number, INACTIVITY_QUESTION);
+      await updateConversations((c) => {
+        const latest = c.chats[jid];
+        if (!latest) return;
+        latest.messages.push({ role: "assistant", content: INACTIVITY_QUESTION, at: now() });
+        latest.messages = latest.messages.slice(-60);
+      });
+      sent++;
+    } catch {
+      failed++;
+      await updateConversations((c) => {
+        const latest = c.chats[jid];
+        if (latest && latest.inactivityReminderAt === chat.inactivityReminderAt) latest.inactivityReminderAt = undefined;
+      });
+    }
+  }
+  return { sent, failed };
 }
 
 /** Chatwoot events: attendant replies go to WhatsApp; resolving gives the chat back to the AI. */

@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { isInactivityDue } from "./agent-core";
 
 export type Company = { id: string; name: string; prompt: string };
 
@@ -49,6 +50,8 @@ export type ChatState = {
   stage: "menu" | "company" | "human";
   companyId?: string | undefined;
   chatwootConversationId?: number | undefined;
+  inactivityReminderAt?: string | undefined;
+  closed?: boolean | undefined;
   messages: ChatMessage[];
 };
 export type Conversations = {
@@ -265,6 +268,34 @@ export const getConversations = () =>
   readJson<Conversations>("conversations.json", { chats: {}, seenIds: [] });
 export const updateConversations = (fn: (c: Conversations) => void) =>
   update<Conversations>("conversations.json", { chats: {}, seenIds: [] }, fn);
+
+/** Claim before sending; Cloud compare-and-swap prevents overlapping scheduled sends. */
+export async function claimInactivityReminder(jid: string, time: number): Promise<ChatState | null> {
+  const cfg = await requireConfig();
+  if (cfg.driver === "cloud") {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("app_data").select("data, updated_at").eq("name", "conversations.json").maybeSingle();
+    if (error) throw new Error(`Banco: ${error.message}`);
+    if (!data) return null;
+    const conversations = data.data as unknown as Conversations;
+    const chat = conversations.chats[jid];
+    if (!chat || !isInactivityDue(chat, time)) return null;
+    chat.inactivityReminderAt = new Date(time).toISOString();
+    const result = await supabaseAdmin.from("app_data").update({
+      data: JSON.parse(JSON.stringify(conversations)), updated_at: new Date().toISOString(),
+    }).eq("name", "conversations.json").eq("updated_at", data.updated_at).select("name");
+    if (result.error) throw new Error(`Banco: ${result.error.message}`);
+    return result.data?.length ? chat : null;
+  }
+  let claimed: ChatState | null = null;
+  await updateConversations((c) => {
+    const chat = c.chats[jid];
+    if (!chat || !isInactivityDue(chat, time)) return;
+    chat.inactivityReminderAt = new Date(time).toISOString();
+    claimed = structuredClone(chat);
+  });
+  return claimed;
+}
 
 // Default admin: user "admin" (password hash only, never plaintext).
 const authFallback = (): AuthData => ({
