@@ -1,17 +1,19 @@
-# Portainer em Docker Standalone. Construa a imagem na VPS antes do Deploy.
+# Portainer: Stacks → Add stack → Repository (este arquivo).
+# Antes do Deploy, troque: SEU_DOMINIO, TROQUE_SENHA_DB (2x), TROQUE_SENHA_ROOT, TROQUE_SEGREDO_CRON (2x).
+# Traefik: rede "traefik_public" e certificado "letsencrypt". Ajuste se os seus nomes forem outros.
 services:
   app:
+    build: .
     image: fotogrer-agent:latest
-    pull_policy: never
     restart: unless-stopped
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_NAME: whatsagent
       DB_USER: whatsagent
-      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no Portainer}
+      DB_PASSWORD: "TROQUE_SENHA_DB"
       COOKIE_SECURE: "true"
-      LOVABLE_CRON_SECRET: ${LOVABLE_CRON_SECRET:?Defina LOVABLE_CRON_SECRET no Portainer}
+      LOVABLE_CRON_SECRET: "TROQUE_SEGREDO_CRON"
     volumes:
       - app_data:/app/data
     depends_on:
@@ -22,11 +24,11 @@ services:
       - traefik_public
     labels:
       - traefik.enable=true
-      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik_public}
-      - traefik.http.routers.whatsagent.rule=Host(`agente.evenon.com.br`)
-      - traefik.http.routers.whatsagent.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.docker.network=traefik_public
+      - traefik.http.routers.whatsagent.rule=Host(`SEU_DOMINIO`)
+      - traefik.http.routers.whatsagent.entrypoints=websecure
       - traefik.http.routers.whatsagent.tls=true
-      - traefik.http.routers.whatsagent.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.whatsagent.tls.certresolver=letsencrypt
       - traefik.http.routers.whatsagent.service=whatsagent
       - traefik.http.services.whatsagent.loadbalancer.server.port=3000
 
@@ -36,8 +38,8 @@ services:
     environment:
       MYSQL_DATABASE: whatsagent
       MYSQL_USER: whatsagent
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no Portainer}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no Portainer}
+      MYSQL_PASSWORD: "TROQUE_SENHA_DB"
+      MYSQL_ROOT_PASSWORD: "TROQUE_SENHA_ROOT"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -54,7 +56,7 @@ services:
     image: curlimages/curl:8.12.1
     restart: unless-stopped
     environment:
-      LOVABLE_CRON_SECRET: ${LOVABLE_CRON_SECRET:?Defina LOVABLE_CRON_SECRET no Portainer}
+      LOVABLE_CRON_SECRET: "TROQUE_SEGREDO_CRON"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - 'while true; do curl --fail --silent --show-error --connect-timeout 10 --max-time 50 -X POST -H "Authorization: Bearer $$LOVABLE_CRON_SECRET" http://app:3000/api/public/jobs/inactivity || echo "Falha na rotina de inatividade" >&2; sleep 60; done'
@@ -72,4 +74,3 @@ networks:
   interna:
   traefik_public:
     external: true
-    name: ${TRAEFIK_NETWORK:-traefik_public}
