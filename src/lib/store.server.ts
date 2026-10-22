@@ -46,24 +46,6 @@ export type DbConfig = {
   password?: string;
 };
 
-export type AdminUser = { username: string; salt: string; hash: string };
-export type Session = { token: string; username: string; expires: number };
-export type AuthData = {
-  users: AdminUser[];
-  sessions: Session[];
-  attempts: Record<string, { count: number; until: number }>;
-};
-
-// ---------- Install config (MySQL or local files) ----------
-export type DbConfig = {
-  driver: "mysql" | "file";
-  host?: string;
-  port?: number;
-  database?: string;
-  user?: string;
-  password?: string;
-};
-
 const dataDir = () => process.env["DATA_DIR"] || path.join(process.cwd(), "data");
 const configFile = () => path.join(dataDir(), "config.json");
 
