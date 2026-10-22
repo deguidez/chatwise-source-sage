@@ -265,7 +265,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", handledBy: chat.handledBy ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
@@ -318,14 +318,14 @@ export const sendAgentMessage = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await guard();
-    await (await agent()).agentSend(data.jid, data.text, data.media);
+    const me = await guard();
+    await (await agent()).agentSend(data.jid, data.text, data.media, me);
     return { ok: true };
   });
 
 export const assumeConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
-  await guard();
-  await (await agent()).assumeChat(data.jid);
+  const me = await guard();
+  await (await agent()).assumeChat(data.jid, me);
   return { ok: true };
 });
 
@@ -338,8 +338,8 @@ export const resolveConversation = createServerFn({ method: "POST" })
   });
 
 export const reopenConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
-  await guard();
-  await (await agent()).reopenChat(data.jid);
+  const me = await guard();
+  await (await agent()).assumeChat(data.jid, me);
   return { ok: true };
 });
 
