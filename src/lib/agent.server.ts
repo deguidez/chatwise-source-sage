@@ -18,7 +18,7 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
     if (!s.geminiKey) throw new Error("Chave do Gemini não configurada");
     const primary = (s.geminiModel || "").trim().replace(/^models\//, "").replace(/^gemini-2\.5-flash(-lite)?$/, "") || "gemini-3.8-flash";
     // When Google is overloaded (503/429), wait and retry, then try a lighter model.
-    const attempts = [primary, primary, "gemini-3.8-flash-lite", primary];
+    const attempts = [primary, "gemini-3.8-flash-lite", "gemini-flash-latest", primary];
     let res!: Response;
     let body = "";
     for (let i = 0; i < attempts.length; i++) {
@@ -35,7 +35,11 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
       if (res.ok || ![429, 500, 503, 404].includes(res.status)) break;
     }
     if (!res.ok) {
-      if (res.status === 503 || res.status === 429) throw new Error("O Gemini está sobrecarregado no momento. Tente de novo em alguns minutos.");
+      console.error(`Gemini falhou [${res.status}]: ${body.slice(0, 500)}`);
+      // Backup: answer with OpenAI when its key is saved, so the customer is not left without a reply.
+      if (s.openaiKey) return callAI({ ...s, aiProvider: "openai" }, system, turns);
+      if (res.status === 429) throw new Error("O limite gratuito do Gemini foi atingido. Aguarde alguns minutos ou ative o faturamento no Google AI Studio.");
+      if (res.status === 503) throw new Error("O Gemini está sobrecarregado no momento. Tente de novo em alguns minutos.");
       throw new Error(`Gemini [${res.status}]: ${body.slice(0, 300)}`);
     }
     const json = JSON.parse(body);
