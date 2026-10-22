@@ -4,6 +4,7 @@ import { z } from "zod";
 const auth = () => import("./auth.server");
 const store = () => import("./store.server");
 const guard = async () => (await auth()).requireAdmin();
+const guardSuper = async () => (await auth()).requireSuper();
 
 const mask = (v: string) => (v ? `••••${v.slice(-4)}` : "");
 
@@ -60,7 +61,7 @@ export const changePassword = createServerFn({ method: "POST" })
   });
 
 export const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
-  await guard();
+  await guardSuper();
   const s = await (await store()).getSettings();
   return {
     ...s,
@@ -108,7 +109,7 @@ const settingsSchema = z.object({
 export const saveSettings = createServerFn({ method: "POST" })
   .validator(settingsSchema)
   .handler(async ({ data }) => {
-    await guard();
+    await guardSuper();
     await (await store()).updateSettings((s) => {
       if ((data.handoffProvider ?? s.handoffProvider) !== "chatwoot" && !(data.attendantNumber ?? s.attendantNumber)) {
         throw new Error("Informe o WhatsApp do atendente para receber os avisos");
