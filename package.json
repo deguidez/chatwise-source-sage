@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:hosting": "NITRO_PRESET=node-server vite build",
+    "start": "node app.cjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

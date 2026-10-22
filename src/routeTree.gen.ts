@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InstallRouteImport } from './routes/install'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiPublicEvolutionWebhookRouteImport } from './routes/api/public/evolution/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstallRoute = InstallRouteImport.update({
+  id: '/install',
+  path: '/install',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -32,30 +38,34 @@ const ApiPublicEvolutionWebhookRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/login': typeof LoginRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/login': typeof LoginRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/login': typeof LoginRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/public/evolution/webhook'
+  fullPaths: '/' | '/install' | '/login' | '/api/public/evolution/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/public/evolution/webhook'
-  id: '__root__' | '/' | '/login' | '/api/public/evolution/webhook'
+  to: '/' | '/install' | '/login' | '/api/public/evolution/webhook'
+  id: '__root__' | '/' | '/install' | '/login' | '/api/public/evolution/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InstallRoute: typeof InstallRoute
   LoginRoute: typeof LoginRoute
   ApiPublicEvolutionWebhookRoute: typeof ApiPublicEvolutionWebhookRoute
 }
@@ -67,6 +77,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/install': {
+      id: '/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof InstallRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InstallRoute: InstallRoute,
   LoginRoute: LoginRoute,
   ApiPublicEvolutionWebhookRoute: ApiPublicEvolutionWebhookRoute,
 }
