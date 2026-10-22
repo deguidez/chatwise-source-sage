@@ -17,8 +17,7 @@ services:
     volumes:
       - app_data:/app/data
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
     networks:
       - interna
       - OrionNet
