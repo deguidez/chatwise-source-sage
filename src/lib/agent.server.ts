@@ -439,7 +439,7 @@ export async function sendInactivityReminders(time = Date.now()) {
       if (!latest || !isAutoCloseDue(latest, time)) return;
       latest.closed = true;
       latest.stage = "menu";
-      latest.companyId = undefined;
+      latest.closedAt = now();
       latest.messages.push({ role: "assistant", content: AUTO_CLOSE_MESSAGE, at: now() });
       latest.messages = latest.messages.slice(-200);
       target = { number: latest.number, channel: latest.channel };
