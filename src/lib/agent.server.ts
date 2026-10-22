@@ -1,4 +1,4 @@
-import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, wantsToCancel, type IncomingMessage } from "./agent-core";
+import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, type IncomingMessage } from "./agent-core";
 import {
   getConversations,
   getKnowledge,
@@ -305,7 +305,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 /** Scheduled sweep: one reminder per unanswered turn, never during a handoff. */
 export async function sendInactivityReminders(time = Date.now()) {
   const settings = await getSettings();
-  if (!settings.enabled) return { sent: 0, failed: 0 };
+  if (!settings.enabled) return { sent: 0, failed: 0, closed: 0 };
   const conversations = await getConversations();
   let sent = 0;
   let failed = 0;
