@@ -7,9 +7,7 @@ export const Route = createFileRoute("/api/public/evolution/webhook")({
         const { getSettings } = await import("@/lib/store.server");
         const settings = await getSettings();
         const token = new URL(request.url).searchParams.get("token");
-        if (!token || token !== settings.webhookToken) {
-          return new Response("unauthorized", { status: 401 });
-        }
+        if (!token || token !== settings.webhookToken) return new Response("unauthorized", { status: 401 });
         let body: unknown;
         try {
           body = await request.json();
@@ -21,11 +19,10 @@ export const Route = createFileRoute("/api/public/evolution/webhook")({
         if (!msg) return Response.json({ status: "ignored" });
         try {
           const { handleIncoming } = await import("@/lib/agent.server");
-          const status = await handleIncoming(msg);
-          return Response.json({ status });
+          return Response.json({ status: await handleIncoming(msg, "evolution") });
         } catch (err) {
-          console.error("Webhook error:", err);
-          return Response.json({ status: "error", message: String(err) }, { status: 200 });
+          console.error("Evolution webhook error:", err);
+          return Response.json({ status: "error" });
         }
       },
     },
