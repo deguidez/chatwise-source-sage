@@ -40,7 +40,7 @@ describe("same-number WhatsApp handoff", () => {
     fetchMock.mockClear();
     state.settings.handoffProvider = "chatwoot";
     await handleIncoming(incoming("mais uma dúvida", "2"), "evolution");
-    expect(await sendInactivityReminders(Date.now() + 120000)).toEqual({ sent: 0, failed: 0 });
+    expect(await sendInactivityReminders(Date.now() + 120000)).toMatchObject({ sent: 0, failed: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(state.conversations.chats[jid]?.messages.at(-1)?.role).toBe("user");
   });

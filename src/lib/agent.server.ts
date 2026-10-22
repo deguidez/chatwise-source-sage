@@ -1,4 +1,4 @@
-import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, wantsToCancel, type IncomingMessage } from "./agent-core";
+import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, type IncomingMessage } from "./agent-core";
 import {
   getConversations,
   getKnowledge,
@@ -305,7 +305,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 /** Scheduled sweep: one reminder per unanswered turn, never during a handoff. */
 export async function sendInactivityReminders(time = Date.now()) {
   const settings = await getSettings();
-  if (!settings.enabled) return { sent: 0, failed: 0 };
+  if (!settings.enabled) return { sent: 0, failed: 0, closed: 0 };
   const conversations = await getConversations();
   let sent = 0;
   let failed = 0;
@@ -334,7 +334,25 @@ export async function sendInactivityReminders(time = Date.now()) {
       });
     }
   }
-  return { sent, failed };
+  // Second step: customers silent after the question get an automatic closing message.
+  let closedCount = 0;
+  for (const jid of Object.keys((await getConversations()).chats)) {
+    let target: { number: string; channel: typeof conversations.chats[string]["channel"] } | null = null;
+    await updateConversations((c) => {
+      const latest = c.chats[jid];
+      if (!latest || !isAutoCloseDue(latest, time)) return;
+      latest.closed = true;
+      latest.stage = "menu";
+      latest.companyId = undefined;
+      latest.messages.push({ role: "assistant", content: AUTO_CLOSE_MESSAGE, at: now() });
+      latest.messages = latest.messages.slice(-60);
+      target = { number: latest.number, channel: latest.channel };
+    });
+    const t = target as { number: string; channel: typeof conversations.chats[string]["channel"] } | null;
+    if (!t) continue;
+    try { await sendWhatsApp(settings, t.channel, t.number, AUTO_CLOSE_MESSAGE); closedCount++; } catch { failed++; }
+  }
+  return { sent, failed, closed: closedCount };
 }
 
 /** Chatwoot events: attendant replies go to WhatsApp; resolving gives the chat back to the AI. */

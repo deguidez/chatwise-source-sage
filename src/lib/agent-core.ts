@@ -126,7 +126,7 @@ export type InactivityState = {
   stage: "menu" | "company" | "human";
   closed?: boolean | undefined;
   inactivityReminderAt?: string | undefined;
-  messages: { role: "user" | "assistant" | "agent"; at: string }[];
+  messages: { role: "user" | "assistant" | "agent"; at: string; content?: string }[];
 };
 
 export function isInactivityDue(chat: InactivityState, time: number): boolean {
@@ -135,6 +135,18 @@ export function isInactivityDue(chat: InactivityState, time: number): boolean {
   if (!last || last.role !== "assistant") return false;
   const at = Date.parse(last.at);
   return Number.isFinite(at) && time - at >= INACTIVITY_MS;
+}
+
+export const AUTO_CLOSE_MS = 1 * 60 * 1000;
+export const AUTO_CLOSE_MESSAGE = "Como não tivemos resposta, seu atendimento foi finalizado. Se precisar de algo, é só mandar uma nova mensagem. 😊";
+
+/** After the inactivity question, close the chat if the customer stays silent for AUTO_CLOSE_MS. */
+export function isAutoCloseDue(chat: InactivityState, time: number): boolean {
+  if (chat.stage === "human" || chat.closed || !chat.inactivityReminderAt) return false;
+  const last = chat.messages.at(-1);
+  if (!last || last.role !== "assistant" || last.content !== INACTIVITY_QUESTION) return false;
+  const at = Date.parse(last.at ?? "");
+  return Number.isFinite(at) && time - at >= AUTO_CLOSE_MS;
 }
 
 export function wantsToCancel(text: string): boolean {
