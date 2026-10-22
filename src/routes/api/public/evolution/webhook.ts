@@ -17,8 +17,9 @@ export const Route = createFileRoute("/api/public/evolution/webhook")({
         const { parseEvolutionWebhook, parseEvolutionOwnMessage, isStaffCloseCommand } = await import("@/lib/agent-core");
         const own = parseEvolutionOwnMessage(body);
         if (own) {
-          if (!isStaffCloseCommand(own.text)) return Response.json({ status: "ignored" });
-          const { closeByStaff } = await import("@/lib/agent.server");
+          const { closeByStaff, recordStaffMessage } = await import("@/lib/agent.server");
+          const recorded = await recordStaffMessage(own.jid, own.text);
+          if (!isStaffCloseCommand(own.text)) return Response.json({ status: recorded });
           return Response.json({ status: await closeByStaff(own.jid) });
         }
         const msg = parseEvolutionWebhook(body);
