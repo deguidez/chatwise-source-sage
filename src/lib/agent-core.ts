@@ -126,7 +126,7 @@ export type InactivityState = {
   stage: "menu" | "company" | "human";
   closed?: boolean | undefined;
   inactivityReminderAt?: string | undefined;
-  messages: { role: "user" | "assistant" | "agent"; at: string }[];
+  messages: { role: "user" | "assistant" | "agent"; at: string; content?: string }[];
 };
 
 export function isInactivityDue(chat: InactivityState, time: number): boolean {
