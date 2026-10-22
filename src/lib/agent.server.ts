@@ -158,6 +158,7 @@ async function forwardToChatwoot(s: Settings, conversationId: number, text: stri
 
 // ---------------- Main flow ----------------
 const now = () => new Date().toISOString();
+export const HUMAN_WAIT_MESSAGE = "Seu atendimento já foi encaminhado. Um atendente irá te atender em instantes. 🙂";
 
 async function saveChat(jid: string, fn: (c: ChatState) => void, base: ChatState) {
   await updateConversations((c) => {
