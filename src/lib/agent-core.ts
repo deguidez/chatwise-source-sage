@@ -112,7 +112,7 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   const out = new Set<string>();
   for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)[^"']*["']/gi)) {
     try {
-      const u = new URL(m[1], base);
+      const u = new URL(m[1]!, base);
       u.hash = "";
       if (u.hostname !== base.hostname || !/^https?:$/.test(u.protocol)) continue;
       if (/\.(jpe?g|png|gif|webp|svg|pdf|zip|mp4|mp3|css|js|ico|xml)$/i.test(u.pathname)) continue;

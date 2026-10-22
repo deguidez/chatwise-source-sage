@@ -192,7 +192,7 @@ export const addUrl = createServerFn({ method: "POST" })
       const htmls = await Promise.all(batch.map((u) => (u === data.url ? Promise.resolve(first) : get(u))));
       htmls.forEach((html, i) => {
         if (!html) return;
-        const u = batch[i];
+        const u = batch[i]!;
         const { title, text } = htmlToText(html);
         if (!mainTitle) mainTitle = title;
         const desc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "";
