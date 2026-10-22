@@ -14,7 +14,13 @@ export const Route = createFileRoute("/api/public/evolution/webhook")({
         } catch {
           return new Response("invalid json", { status: 400 });
         }
-        const { parseEvolutionWebhook } = await import("@/lib/agent-core");
+        const { parseEvolutionWebhook, parseEvolutionOwnMessage, isStaffCloseCommand } = await import("@/lib/agent-core");
+        const own = parseEvolutionOwnMessage(body);
+        if (own) {
+          if (!isStaffCloseCommand(own.text)) return Response.json({ status: "ignored" });
+          const { closeByStaff } = await import("@/lib/agent.server");
+          return Response.json({ status: await closeByStaff(own.jid) });
+        }
         const msg = parseEvolutionWebhook(body);
         if (!msg) return Response.json({ status: "ignored" });
         try {
