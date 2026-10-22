@@ -235,7 +235,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
@@ -265,5 +265,92 @@ export const returnChatToAI = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await guard();
     await (await import("./agent.server")).returnToAI(data.jid);
+    return { ok: true };
+  });
+
+const agent = () => import("./agent.server");
+const jidSchema = z.object({ jid: z.string().min(1).max(200) });
+
+export const sendAgentMessage = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      jid: z.string().min(1).max(200),
+      text: z.string().max(4000).default(""),
+      media: z
+        .object({
+          kind: z.enum(["image", "video", "audio", "document", "sticker"]),
+          mimetype: z.string().min(1).max(120),
+          fileName: z.string().max(200).optional(),
+          // base64 without the data: prefix, up to ~16 MB file
+          data: z.string().min(1).max(22_000_000),
+        })
+        .optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await guard();
+    await (await agent()).agentSend(data.jid, data.text, data.media);
+    return { ok: true };
+  });
+
+export const assumeConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
+  await guard();
+  await (await agent()).assumeChat(data.jid);
+  return { ok: true };
+});
+
+export const resolveConversation = createServerFn({ method: "POST" })
+  .validator(z.object({ jid: z.string().min(1).max(200), notify: z.boolean().default(true) }))
+  .handler(async ({ data }) => {
+    await guard();
+    await (await agent()).resolveChat(data.jid, data.notify);
+    return { ok: true };
+  });
+
+export const reopenConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
+  await guard();
+  await (await agent()).reopenChat(data.jid);
+  return { ok: true };
+});
+
+export const renameConversation = createServerFn({ method: "POST" })
+  .validator(z.object({ jid: z.string().min(1).max(200), name: z.string().trim().min(1).max(100) }))
+  .handler(async ({ data }) => {
+    await guard();
+    await (await agent()).renameChat(data.jid, data.name);
+    return { ok: true };
+  });
+
+export const loadMedia = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().max(60) }))
+  .handler(async ({ data }) => {
+    await guard();
+    const m = await (await store()).getMedia(data.id);
+    if (!m) throw new Error("Arquivo não encontrado");
+    return m;
+  });
+
+export const listQuickReplies = createServerFn({ method: "GET" }).handler(async () => {
+  await guard();
+  return (await store()).getQuickReplies();
+});
+
+export const saveQuickReply = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string().max(60).optional(), shortcut: z.string().trim().min(1).max(40), text: z.string().trim().min(1).max(4000) }))
+  .handler(async ({ data }) => {
+    await guard();
+    const shortcut = data.shortcut.replace(/^\/+/, "").toLowerCase();
+    await (await store()).updateQuickReplies((items) => {
+      const item = { id: data.id || crypto.randomUUID(), shortcut, text: data.text };
+      return data.id ? items.map((i) => (i.id === data.id ? item : i)) : [...items, item];
+    });
+    return { ok: true };
+  });
+
+export const deleteQuickReply = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string().max(60) }))
+  .handler(async ({ data }) => {
+    await guard();
+    await (await store()).updateQuickReplies((items) => items.filter((i) => i.id !== data.id));
     return { ok: true };
   });
