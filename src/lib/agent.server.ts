@@ -334,7 +334,25 @@ export async function sendInactivityReminders(time = Date.now()) {
       });
     }
   }
-  return { sent, failed };
+  // Second step: customers silent after the question get an automatic closing message.
+  let closedCount = 0;
+  for (const jid of Object.keys((await getConversations()).chats)) {
+    let target: { number: string; channel: typeof conversations.chats[string]["channel"] } | null = null;
+    await updateConversations((c) => {
+      const latest = c.chats[jid];
+      if (!latest || !isAutoCloseDue(latest, time)) return;
+      latest.closed = true;
+      latest.stage = "menu";
+      latest.companyId = undefined;
+      latest.messages.push({ role: "assistant", content: AUTO_CLOSE_MESSAGE, at: now() });
+      latest.messages = latest.messages.slice(-60);
+      target = { number: latest.number, channel: latest.channel };
+    });
+    const t = target as { number: string; channel: typeof conversations.chats[string]["channel"] } | null;
+    if (!t) continue;
+    try { await sendWhatsApp(settings, t.channel, t.number, AUTO_CLOSE_MESSAGE); closedCount++; } catch { failed++; }
+  }
+  return { sent, failed, closed: closedCount };
 }
 
 /** Chatwoot events: attendant replies go to WhatsApp; resolving gives the chat back to the AI. */
