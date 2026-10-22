@@ -167,11 +167,49 @@ export const addUrl = createServerFn({ method: "POST" })
   .validator(z.object({ url: z.string().url().max(2000), companyId: z.string().max(60).default("") }))
   .handler(async ({ data }) => {
     await guard();
-    const { htmlToText } = await import("./agent-core");
-    const res = await fetch(data.url, { headers: { "User-Agent": "Mozilla/5.0 WhatsAgent" } });
-    if (!res.ok) throw new Error(`Não foi possível abrir o site (${res.status})`);
-    const { title, text } = htmlToText(await res.text());
-    return addItem("url", title || data.url, `Fonte: ${data.url}\n\n${text}`, data.companyId);
+    const { htmlToText, extractLinks, extractImages } = await import("./agent-core");
+    const MAX_PAGES = 20;
+    const get = async (u: string) => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 15000);
+        const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 WhatsAgent" }, signal: ctrl.signal });
+        clearTimeout(t);
+        if (!r.ok || !(r.headers.get("content-type") ?? "").includes("html")) return null;
+        return await r.text();
+      } catch { return null; }
+    };
+    const first = await get(data.url);
+    if (!first) throw new Error("Não foi possível abrir o site");
+    const queue = [data.url, ...extractLinks(first, data.url)];
+    const seen = new Set<string>();
+    const pages: string[] = [];
+    const images = new Map<string, string>();
+    let mainTitle = "";
+    while (queue.length && seen.size < MAX_PAGES) {
+      const batch = queue.splice(0, 5).filter((u) => !seen.has(u));
+      batch.forEach((u) => seen.add(u));
+      const htmls = await Promise.all(batch.map((u) => (u === data.url ? Promise.resolve(first) : get(u))));
+      htmls.forEach((html, i) => {
+        if (!html) return;
+        const u = batch[i];
+        const { title, text } = htmlToText(html);
+        if (!mainTitle) mainTitle = title;
+        const desc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "";
+        if (text) pages.push(`### ${title || u}\nPágina: ${u}\n${desc ? desc + "\n" : ""}${text.slice(0, 15000)}`);
+        for (const img of extractImages(html, u)) if (!images.has(img.url) && images.size < 60) images.set(img.url, img.alt || title);
+        for (const l of extractLinks(html, data.url)) if (!seen.has(l) && !queue.includes(l)) queue.push(l);
+      });
+    }
+    const fotos = images.size
+      ? `\n\n### Fotos do site (envie o link quando o cliente pedir foto)\n${[...images].map(([u, a]) => `- ${a || "Foto"}: ${u}`).join("\n")}`
+      : "";
+    return addItem(
+      "url",
+      `${mainTitle || data.url} (${pages.length} páginas, ${images.size} fotos)`,
+      `Fonte: ${data.url}\n\n${pages.join("\n\n")}${fotos}`,
+      data.companyId,
+    );
   });
 
 export const addPdf = createServerFn({ method: "POST" })
