@@ -68,7 +68,8 @@ export type Conversations = {
   seenIds: string[];
 };
 
-export type AdminUser = { username: string; salt: string; hash: string };
+export type UserRole = "super" | "attendant";
+export type AdminUser = { username: string; salt: string; hash: string; role?: UserRole | undefined };
 export type Session = { token: string; username: string; expires: number };
 export type AuthData = {
   users: AdminUser[];
@@ -313,6 +314,7 @@ const authFallback = (): AuthData => ({
   users: [
     {
       username: "admin",
+      role: "super" as const,
       salt: "547e9c2d635053bd0f1cba7d8aed8257",
       hash: "5aa7705282dc796458044d75347ef483d4c5fb7cc0eb3dfc57580da89915be73edf71011a925ad73768f6e289a0aa415eb3779428e6582b73252956bb966a3b7",
     },
