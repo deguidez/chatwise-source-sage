@@ -217,6 +217,16 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   if (route.kind === "silent") {
     if (chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
     await saveChat(msg.jid, (c) => c.messages.push(userMsg), base);
+    // Reassure the customer while waiting, at most once every 5 minutes.
+    const lastNotice = [...chat.messages].reverse().find((m) => m.role === "assistant" && m.content === HUMAN_WAIT_MESSAGE);
+    if (!lastNotice || Date.now() - Date.parse(lastNotice.at) >= 5 * 60 * 1000) {
+      try {
+        await sendWhatsApp(s, channel, msg.number, HUMAN_WAIT_MESSAGE);
+        await saveChat(msg.jid, (c) => c.messages.push({ role: "assistant", content: HUMAN_WAIT_MESSAGE, at: now() }), base);
+      } catch (error) {
+        console.error("Aviso de espera falhou:", error);
+      }
+    }
     return "forwarded";
   }
 
