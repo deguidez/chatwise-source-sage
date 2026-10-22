@@ -15,21 +15,28 @@ type Turn = { role: "user" | "assistant"; content: string };
 async function callAI(s: Settings, system: string, turns: Turn[]): Promise<string> {
   if (s.aiProvider === "gemini") {
     if (!s.geminiKey) throw new Error("Chave do Gemini não configurada");
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        (s.geminiModel || "").trim().replace(/^models\//, "").replace(/^gemini-2\.5-flash(-lite)?$/, "") || "gemini-3.8-flash",
-      )}:generateContent`,
-      {
+    const primary = (s.geminiModel || "").trim().replace(/^models\//, "").replace(/^gemini-2\.5-flash(-lite)?$/, "") || "gemini-3.8-flash";
+    // When Google is overloaded (503/429), wait and retry, then try a lighter model.
+    const attempts = [primary, primary, "gemini-3.8-flash-lite", primary];
+    let res!: Response;
+    let body = "";
+    for (let i = 0; i < attempts.length; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i] ?? primary)}:generateContent`, {
         method: "POST",
         headers: { "x-goog-api-key": s.geminiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: turns.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] })),
         }),
-      },
-    );
-    const body = await res.text();
-    if (!res.ok) throw new Error(`Gemini [${res.status}]: ${body.slice(0, 300)}`);
+      });
+      body = await res.text();
+      if (res.ok || ![429, 500, 503, 404].includes(res.status)) break;
+    }
+    if (!res.ok) {
+      if (res.status === 503 || res.status === 429) throw new Error("O Gemini está sobrecarregado no momento. Tente de novo em alguns minutos.");
+      throw new Error(`Gemini [${res.status}]: ${body.slice(0, 300)}`);
+    }
     const json = JSON.parse(body);
     return (json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("").trim();
   }
