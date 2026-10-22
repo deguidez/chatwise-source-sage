@@ -4,11 +4,13 @@ import type { Conversations, Settings } from "@/lib/store.server";
 const state = vi.hoisted(() => ({
   conversations: { chats: {}, seenIds: [] } as Conversations,
   settings: {} as Settings,
+  knowledge: [] as any[],
 }));
 vi.mock("@/lib/store.server", () => ({
   getSettings: async () => state.settings,
   getConversations: async () => structuredClone(state.conversations),
   getKnowledge: async () => [],
+  updateKnowledge: async (fn: (i: any[]) => any[]) => { state.knowledge = fn(state.knowledge ?? []); },
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async () => null,
 }));
@@ -108,4 +110,16 @@ describe("attendant closes from the company phone", () => {
     expect(state.conversations.chats[jid]?.stage).toBe("menu");
     expect(await handleIncoming(incoming("oi", "2"), "evolution")).toBe("menu");
   });
+});
+
+it("aprende automaticamente com as respostas do atendente ao encerrar", async () => {
+  state.knowledge = [];
+  const { recordStaffMessage, closeByStaff } = await import("@/lib/agent.server");
+  await handleIncoming(incoming("qual o horário da retirada do kit?", "1"), "evolution");
+  await handleIncoming(incoming("atendente", "2"), "evolution");
+  expect(await recordStaffMessage(jid, "A retirada é das 14h30 às 20h no Espetop.")).toBe("staff-recorded");
+  await closeByStaff(jid);
+  expect(state.knowledge).toHaveLength(1);
+  expect(state.knowledge[0].companyId).toBe("a");
+  expect(state.knowledge[0].content).toContain("Resposta do atendente: A retirada é das 14h30 às 20h no Espetop.");
 });

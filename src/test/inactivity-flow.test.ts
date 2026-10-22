@@ -11,6 +11,7 @@ vi.mock("@/lib/store.server", () => ({
   getSettings: async () => state.settings,
   getConversations: async () => structuredClone(state.conversations),
   getKnowledge: async () => [],
+  updateKnowledge: async (fn: (i: any[]) => any[]) => { state.knowledge = fn(state.knowledge ?? []); },
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async (jid: string, time: number) => {
     const chat = state.conversations.chats[jid];
