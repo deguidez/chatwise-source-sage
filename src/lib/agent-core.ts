@@ -105,3 +105,56 @@ export function htmlToText(html: string): { title: string; text: string } {
     .trim();
   return { title, text };
 }
+
+/** Parse a YCloud "whatsapp.inbound_message.received" webhook. */
+export function parseYCloudWebhook(body: any): IncomingMessage | null {
+  if (body?.type !== "whatsapp.inbound_message.received") return null;
+  const m = body.whatsappInboundMessage;
+  if (!m?.from) return null;
+  const text: string = m.text?.body ?? m.image?.caption ?? m.button?.text ?? m.interactive?.button_reply?.title ?? "";
+  if (!text.trim()) return null;
+  const number = String(m.from).replace(/\D/g, "");
+  return { id: String(m.id ?? body.id ?? ""), jid: `${number}@ycloud`, number, name: m.customerProfile?.name ?? "", text: text.trim(), isGroup: false };
+}
+
+export const TRANSFER_TOKEN = "[TRANSFERIR]";
+
+const HUMAN_RE = /\b(atendente|humano|pessoa|algu[eé]m de verdade|falar com (um|uma)?\s*(pessoa|atendente|algu[eé]m))\b/i;
+export const wantsHuman = (text: string) => HUMAN_RE.test(norm(text)) || HUMAN_RE.test(text);
+
+export function buildMenu(greeting: string, companies: { name: string }[], humanOption: boolean) {
+  const opts = companies.map((c, i) => `${i + 1} - ${c.name}`);
+  if (humanOption) opts.push(`${companies.length + 1} - Falar com um atendente`);
+  return `${greeting}\n\n*Escolha uma opção:*\n\n${opts.join("\n")}`;
+}
+
+export type Route =
+  | { kind: "menu" }
+  | { kind: "select"; companyId: string }
+  | { kind: "human" }
+  | { kind: "ai"; companyId: string }
+  | { kind: "silent" };
+
+/** Decide what to do with an incoming message given the conversation state. */
+export function routeMessage(
+  state: { stage: "menu" | "company" | "human"; companyId?: string } | undefined,
+  text: string,
+  companies: { id: string; name: string }[],
+  humanOption: boolean,
+): Route {
+  if (state?.stage === "human") return { kind: "silent" };
+  const t = norm(text).trim();
+  if (state?.stage === "company" && state.companyId && companies.some((c) => c.id === state.companyId)) {
+    if (t === "0" || t === "menu") return { kind: "menu" };
+    if (wantsHuman(text)) return { kind: "human" };
+    return { kind: "ai", companyId: state.companyId };
+  }
+  // Menu stage: pick a company by number or name
+  const n = Number(t.match(/^\d+/)?.[0]);
+  if (n >= 1 && n <= companies.length) return { kind: "select", companyId: companies[n - 1]!.id };
+  if (humanOption && n === companies.length + 1) return { kind: "human" };
+  const byName = companies.find((c) => t.includes(norm(c.name)));
+  if (byName) return { kind: "select", companyId: byName.id };
+  if (wantsHuman(text)) return { kind: "human" };
+  return { kind: "menu" };
+}
