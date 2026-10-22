@@ -17,7 +17,7 @@ O sistema roda em três partes: o próprio sistema, o banco de dados dele e um p
 
 ## Confira o Traefik
 
-O arquivo considera que o Traefik usa a rede `orionnet`, a entrada `websecure` e o certificado `letsencrypt`. Se os seus nomes forem outros, altere no arquivo antes do Deploy.
+O arquivo considera que o Traefik usa a rede `OrionNet`, a entrada `websecure` e o certificado `letsencrypt`. Se os seus nomes forem outros, altere no arquivo antes do Deploy.
 
 ## Atualizar depois
 
@@ -25,6 +25,6 @@ No Portainer, abra a stack e clique em **Pull and redeploy**.
 
 ## Problemas comuns
 
-- **Rede não encontrada:** confira com `docker network ls` se o nome da rede do Traefik é `orionnet` (sua rede atual é OrionNet).
+- **Rede não encontrada:** confira com `docker network ls` se o nome da rede do Traefik é `OrionNet` (sua rede atual é OrionNet).
 - **Erro de certificado / 404:** confira o domínio, o DNS e os nomes do Traefik.
 - **Nunca apague os volumes** `mysql_data` e `app_data`: eles guardam seus dados.
