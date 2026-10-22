@@ -40,7 +40,7 @@ function startSession(token: string) {
 }
 
 // The original "admin" account is always super admin, even in old data without a role.
-export function userRole(u: { username: string; role?: string }): "super" | "attendant" {
+export function userRole(u: { username: string; role?: string | undefined }): "super" | "attendant" {
   return u.role === "super" || u.username === "admin" ? "super" : "attendant";
 }
 
