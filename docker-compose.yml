@@ -1,9 +1,10 @@
-# Portainer: Stacks → Add stack → Repository (este arquivo).
+# Portainer: Stacks → Add stack → Web editor (cole este arquivo).
 # Antes do Deploy, troque: SEU_DOMINIO, TROQUE_SENHA_DB (2x), TROQUE_SENHA_ROOT, TROQUE_SEGREDO_CRON (2x).
-# Traefik: rede "traefik_public" e certificado "letsencrypt". Ajuste se os seus nomes forem outros.
+# Antes do Deploy, construa a imagem uma vez no terminal da VPS (passo 3 do guia INSTALACAO-DOCKER.md).
+# Traefik: rede "OrionNet" e certificado "letsencrypt". Ajuste se os seus nomes forem outros.
 services:
   app:
-    build: .
+    image: fotogrer-agent:latest
     restart: unless-stopped
     environment:
       DB_HOST: mysql
