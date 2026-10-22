@@ -217,7 +217,7 @@ const settingsFallback = (): Settings => ({
   openaiKey: "",
   openaiModel: "gpt-4o-mini",
   geminiKey: "",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-3.8-flash",
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "llama3.1",
   waProvider: "evolution",
