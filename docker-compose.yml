@@ -17,8 +17,7 @@ services:
     volumes:
       - app_data:/app/data
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
     networks:
       - interna
       - OrionNet
@@ -61,8 +60,7 @@ services:
     command:
       - 'while true; do curl --fail --silent --show-error --connect-timeout 10 --max-time 50 -X POST -H "Authorization: Bearer $$LOVABLE_CRON_SECRET" http://app:3000/api/public/jobs/inactivity || echo "Falha na rotina de inatividade" >&2; sleep 60; done'
     depends_on:
-      app:
-        condition: service_healthy
+      - app
     networks:
       - interna
 
