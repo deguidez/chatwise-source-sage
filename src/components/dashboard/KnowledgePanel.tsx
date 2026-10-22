@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { addPdf, addText, addUrl, deleteKnowledge, listKnowledge } from "@/lib/api.functions";
+import { addPdf, addText, addUrl, deleteKnowledge, listKnowledge, loadSettings } from "@/lib/api.functions";
 
 const icons = { text: Type, file: FileText, pdf: FileText, url: Globe };
 
@@ -22,6 +22,12 @@ function toBase64(file: File): Promise<string> {
 export function KnowledgePanel() {
   const qc = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: ["knowledge"], queryFn: () => listKnowledge() });
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
+  const companies = settings?.companies ?? [];
+  const [companyId, setCompanyId] = useState("");
+  const [filter, setFilter] = useState("all");
+  const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? "Todas as empresas";
+  const shown = items.filter((i) => filter === "all" || i.companyId === filter);
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -52,10 +58,10 @@ export function KnowledgePanel() {
       }
       if (file.name.toLowerCase().endsWith(".pdf")) {
         const base64 = await toBase64(file);
-        await run(() => addPdf({ data: { name: file.name, base64 } }), `${file.name} adicionado`);
+        await run(() => addPdf({ data: { name: file.name, base64, companyId } }), `${file.name} adicionado`);
       } else {
         const content = await file.text();
-        await run(() => addText({ data: { title: file.name, content, type: "file" } }), `${file.name} adicionado`);
+        await run(() => addText({ data: { title: file.name, content, type: "file", companyId } }), `${file.name} adicionado`);
       }
     }
     if (fileRef.current) fileRef.current.value = "";
@@ -68,7 +74,17 @@ export function KnowledgePanel() {
         <p className="text-muted-foreground">Tudo que o agente pode usar para responder seus clientes.</p>
       </header>
 
-      <div className="rounded-2xl border bg-card p-6">
+      <div className="space-y-4 rounded-2xl border bg-card p-6">
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium">Este conteúdo é de qual empresa?</span>
+          <div className="flex flex-wrap gap-2">
+            {[{ id: "", name: "Todas as empresas" }, ...companies].map((c) => (
+              <button key={c.id} onClick={() => setCompanyId(c.id)} className={`rounded-full border px-3 py-1 text-sm transition-colors ${companyId === c.id ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <Tabs defaultValue="text">
           <TabsList>
             <TabsTrigger value="text">Texto</TabsTrigger>
@@ -81,7 +97,7 @@ export function KnowledgePanel() {
             <Button
               disabled={busy || !text.trim()}
               onClick={async () => {
-                if (await run(() => addText({ data: { title, content: text, type: "text" } }), "Texto adicionado")) {
+                if (await run(() => addText({ data: { title, content: text, type: "text", companyId } }), "Texto adicionado")) {
                   setTitle("");
                   setText("");
                 }
@@ -110,7 +126,7 @@ export function KnowledgePanel() {
             <Button
               disabled={busy || !url}
               onClick={async () => {
-                if (await run(() => addUrl({ data: { url } }), "Site importado")) setUrl("");
+                if (await run(() => addUrl({ data: { url, companyId } }), "Site importado")) setUrl("");
               }}
             >
               Importar
@@ -120,8 +136,15 @@ export function KnowledgePanel() {
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">{items.length} conteúdo(s)</h2>
-        {items.map((i) => {
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">{shown.length} conteúdo(s)</h2>
+          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-md border bg-card px-3 py-1.5 text-sm">
+            <option value="all">Mostrar todos</option>
+            <option value="">Todas as empresas (compartilhado)</option>
+            {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        {shown.map((i) => {
           const Icon = icons[i.type];
           return (
             <div key={i.id} className="flex items-start gap-4 rounded-xl border bg-card p-4">
@@ -131,7 +154,10 @@ export function KnowledgePanel() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{i.title}</div>
                 <p className="line-clamp-2 text-sm text-muted-foreground">{i.preview}</p>
-                <span className="text-xs text-muted-foreground">{i.size.toLocaleString("pt-BR")} caracteres</span>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">{companyName(i.companyId)}</span>
+                  <span>{i.size.toLocaleString("pt-BR")} caracteres</span>
+                </div>
               </div>
               <Button
                 variant="ghost"
