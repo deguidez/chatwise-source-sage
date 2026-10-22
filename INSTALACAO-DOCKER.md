@@ -5,9 +5,18 @@ O sistema roda em três partes: o próprio sistema, o banco de dados dele e um p
 ## Passo a passo
 
 1. **Domínio:** aponte seu domínio (ex.: `agente.evenon.com.br`) para o IP da VPS.
-2. **GitHub:** no Lovable, conecte o projeto ao GitHub (botão GitHub → Connect).
-3. **Portainer:** vá em **Stacks → Add stack → Repository**. Cole o endereço do repositório do GitHub e use o arquivo `docker-compose.yml`.
-4. **Troque no arquivo os seus valores:**
+2. **GitHub:** no Lovable, conecte o projeto ao GitHub (botão GitHub → Connect) e sincronize.
+3. **Construir a imagem no terminal da VPS** (o Portainer não constrói a imagem, só usa a que já existe):
+
+   ```bash
+   git clone https://github.com/SEU-USUARIO/SEU-REPOSITORIO.git /opt/fotogrer-agent
+   cd /opt/fotogrer-agent
+   docker build -t fotogrer-agent:latest .
+   ```
+
+   A primeira construção leva alguns minutos. Para conferir: `docker images | grep fotogrer-agent`.
+
+4. **Portainer:** vá em **Stacks → Add stack → Web editor** e cole o conteúdo do arquivo `docker-compose.yml`. Troque os seus valores:
    - `SEU_DOMINIO` → seu domínio
    - `TROQUE_SENHA_DB` → uma senha do banco (aparece 2 vezes)
    - `TROQUE_SENHA_ROOT` → outra senha
@@ -21,11 +30,20 @@ O arquivo considera que o Traefik usa a rede `OrionNet`, a entrada `websecure` e
 
 ## Atualizar depois
 
-No Portainer, abra a stack e clique em **Pull and redeploy**.
+No terminal da VPS, dentro da pasta do repositório:
+
+```bash
+cd /opt/fotogrer-agent
+git pull
+docker build -t fotogrer-agent:latest .
+```
+
+Depois, no Portainer, abra a stack e clique em **Pull and redeploy**.
 
 ## Problemas comuns
 
-- **"pull access denied":** o Portainer não construiu a imagem. Confira se a stack usa o arquivo `docker-compose.yml` deste repositório (que tem `build: .`). Se persistir, construa manualmente: no terminal da VPS, clone o repositório, rode `docker build -t fotogrer-agent .` dentro da pasta e, no Portainer, use "Web editor" apontando `image: fotogrer-agent`.
-- **Rede não encontrada:** confira com `docker network ls` se o nome da rede do Traefik é `OrionNet` (sua rede atual é OrionNet).
+- **"pull access denied":** a imagem ainda não foi construída na VPS. Faça o passo 3 antes do Deploy.
+- **"no image specified" / erro de build:** use "Web editor" no Portador e garanta que a imagem `fotogrer-agent:latest` existe (`docker images`).
+- **Rede não encontrada:** confira com `docker network ls` se o nome da rede do Traefik é `OrionNet`.
 - **Erro de certificado / 404:** confira o domínio, o DNS e os nomes do Traefik.
 - **Nunca apague os volumes** `mysql_data` e `app_data`: eles guardam seus dados.
