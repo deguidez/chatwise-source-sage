@@ -1,4 +1,5 @@
 import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, type IncomingMessage } from "./agent-core";
+import { aiFetch, captureMetric, whatsAppFetch, type AIContext } from "./metrics.server";
 import {
   getConversations,
   getKnowledge,
@@ -17,33 +18,34 @@ import {
 // ---------------- AI providers ----------------
 type Turn = { role: "user" | "assistant"; content: string };
 
-async function callAI(s: Settings, system: string, turns: Turn[]): Promise<string> {
+async function callAI(s: Settings, system: string, turns: Turn[], context: AIContext): Promise<string> {
   if (s.aiProvider === "gemini") {
     if (!s.geminiKey) throw new Error("Chave do Gemini não configurada");
     const primary = (s.geminiModel || "").trim().replace(/^models\//, "").replace(/^gemini-2\.5-flash(-lite)?$/, "") || "gemini-3.8-flash";
     // When Google is overloaded (503/429), wait and retry, then try a lighter model.
     const attempts = [primary, "gemini-3.8-flash-lite", "gemini-flash-latest", primary];
-    let res!: Response;
+    let res: Response | undefined;
     let body = "";
     for (let i = 0; i < attempts.length; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, 800));
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i] ?? primary)}:generateContent`, {
+      res = await aiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i] ?? primary)}:generateContent`, {
         method: "POST",
         headers: { "x-goog-api-key": s.geminiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: turns.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] })),
         }),
-      });
+      }, "gemini", attempts[i] ?? primary, context);
       body = await res.text();
       if (res.ok || ![429, 500, 503, 404].includes(res.status)) break;
       // Quota exhausted: retrying wastes time, go straight to the backup.
       if (res.status === 429 && body.includes("quota") && s.openaiKey) break;
     }
+    if (!res) throw new Error("Não foi possível consultar o Gemini");
     if (!res.ok) {
       console.error(`Gemini falhou [${res.status}]: ${body.slice(0, 500)}`);
       // Backup: answer with OpenAI when its key is saved, so the customer is not left without a reply.
-      if (s.openaiKey) return callAI({ ...s, aiProvider: "openai" }, system, turns);
+      if (s.openaiKey) return callAI({ ...s, aiProvider: "openai" }, system, turns, context);
       if (res.status === 429) throw new Error("O limite gratuito do Gemini foi atingido. Aguarde alguns minutos ou ative o faturamento no Google AI Studio.");
       if (res.status === 503) throw new Error("O Gemini está sobrecarregado no momento. Tente de novo em alguns minutos.");
       throw new Error(`Gemini [${res.status}]: ${body.slice(0, 300)}`);
@@ -55,21 +57,21 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
     // Fix common typos in the saved address ("ttps://", missing scheme, trailing slash).
     let base = (s.ollamaUrl || "http://localhost:11434").trim().replace(/\/+$/, "").replace(/\/api\/(chat|tags)$/, "");
     base = base.replace(/^h?t?t?p?s?:?\/*(?=[a-z0-9])/i, (m) => (/^h?t?tps/i.test(m) ? "https://" : m.toLowerCase().startsWith("http:") ? "http://" : "https://"));
-    const res = await fetch(`${base}/api/chat`, {
+    const res = await aiFetch(`${base}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: s.ollamaModel || "llama3.1", stream: false, messages: [{ role: "system", content: system }, ...turns] }),
-    });
+    }, "ollama", s.ollamaModel || "llama3.1", context);
     const body = await res.text();
     if (!res.ok) throw new Error(`Ollama [${res.status}]: ${body.slice(0, 300)}`);
     return String(JSON.parse(body).message?.content ?? "").trim();
   }
   if (!s.openaiKey) throw new Error("Chave da OpenAI não configurada");
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await aiFetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${s.openaiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: s.openaiModel || "gpt-4o-mini", messages: [{ role: "system", content: system }, ...turns] }),
-  });
+  }, "openai", s.openaiModel || "gpt-4o-mini", context);
   const body = await res.text();
   if (!res.ok) throw new Error(`OpenAI [${res.status}]: ${body.slice(0, 300)}`);
   return String(JSON.parse(body).choices?.[0]?.message?.content ?? "").trim();
@@ -80,6 +82,7 @@ export async function generateReply(
   history: ChatMessage[],
   question: string,
   companyId?: string,
+  source: "test" | "whatsapp" = "whatsapp",
 ): Promise<string> {
   const company = settings.companies.find((c) => c.id === companyId);
   const knowledge = (await getKnowledge()).filter((k) => !k.companyId || k.companyId === companyId);
@@ -97,28 +100,28 @@ export async function generateReply(
     .filter((m) => m.role !== "agent")
     .slice(-10)
     .map((m) => ({ role: m.role as Turn["role"], content: m.content }));
-  return callAI(settings, system, [...turns, { role: "user", content: question }]);
+  return callAI(settings, system, [...turns, { role: "user", content: question }], { companyId, source, requestId: crypto.randomUUID() });
 }
 
 // ---------------- WhatsApp providers ----------------
-export async function sendWhatsApp(s: Settings, channel: ChatState["channel"], number: string, text: string) {
+export async function sendWhatsApp(s: Settings, channel: ChatState["channel"], number: string, text: string, source = "system") {
   if (channel === "ycloud") {
     if (!s.ycloudKey || !s.ycloudFrom) throw new Error("YCloud não configurado");
-    const res = await fetch("https://api.ycloud.com/v2/whatsapp/messages/sendDirectly", {
+    const res = await whatsAppFetch("https://api.ycloud.com/v2/whatsapp/messages/sendDirectly", {
       method: "POST",
       headers: { "X-API-Key": s.ycloudKey, "Content-Type": "application/json" },
       body: JSON.stringify({ from: s.ycloudFrom, to: `+${number}`, type: "text", text: { body: text } }),
-    });
+    }, channel, number, source);
     if (!res.ok) throw new Error(`YCloud [${res.status}]: ${(await res.text()).slice(0, 300)}`);
     return;
   }
   const { evolutionUrl, evolutionKey, evolutionInstance } = s;
   if (!evolutionUrl || !evolutionKey || !evolutionInstance) throw new Error("Evolution API não configurada");
-  const res = await fetch(`${evolutionUrl.replace(/\/$/, "")}/message/sendText/${encodeURIComponent(evolutionInstance)}`, {
+  const res = await whatsAppFetch(`${evolutionUrl.replace(/\/$/, "")}/message/sendText/${encodeURIComponent(evolutionInstance)}`, {
     method: "POST",
     headers: { apikey: evolutionKey, "Content-Type": "application/json" },
     body: JSON.stringify({ number, text }),
-  });
+  }, channel, number, source);
   if (!res.ok) throw new Error(`Evolution [${res.status}]: ${(await res.text()).slice(0, 300)}`);
 }
 
@@ -141,7 +144,7 @@ export async function sendWhatsAppMedia(s: Settings, channel: ChatState["channel
         fileName: media.fileName || `arquivo.${media.mimetype.split("/")[1]?.split(";")[0] || "bin"}`,
         ...(media.caption ? { caption: media.caption } : {}),
       }];
-  const res = await fetch(url, { method: "POST", headers: { apikey: evolutionKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await whatsAppFetch(url, { method: "POST", headers: { apikey: evolutionKey, "Content-Type": "application/json" }, body: JSON.stringify(body) }, channel, number, "attendant", media.kind);
   if (!res.ok) throw new Error(`Evolution [${res.status}]: ${(await res.text()).slice(0, 300)}`);
 }
 
@@ -256,6 +259,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   await updateConversations((c) => {
     if (msg.id) c.seenIds = [...c.seenIds.slice(-499), msg.id];
   });
+  await captureMetric({ type: "received", channel, companyId: convs.chats[msg.jid]?.companyId, mediaKind: msg.media?.kind || "text", source: "customer" });
 
   const base: ChatState = { name: msg.name, number: msg.number, channel, stage: "menu", messages: [] };
   const chat: ChatState = { ...base, ...convs.chats[msg.jid], name: msg.name || convs.chats[msg.jid]?.name || "" };
@@ -272,8 +276,8 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     await saveChat(msg.jid, (c) => { c.messages.push(userMsg); c.closed = false; c.ticketStatus = undefined; if (!c.name && msg.name) c.name = msg.name; }, { ...base, ...chat });
     return "media-stored";
   }
-  const reply = async (text: string) => {
-    await sendWhatsApp(s, channel, msg.number, text);
+  const reply = async (text: string, source = "system") => {
+    await sendWhatsApp(s, channel, msg.number, text, source);
     return { role: "assistant" as const, content: text, at: now() };
   };
 
@@ -332,7 +336,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       }, base);
       try {
         if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para o atendente");
-        await sendWhatsApp(s, channel, s.attendantNumber, `*Cliente encaminhado para você — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`);
+        await sendWhatsApp(s, channel, s.attendantNumber, `*Cliente encaminhado para você — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`, "notification");
         return "transferred-other";
       } catch (error) {
         await saveChat(msg.jid, (c) => {
@@ -354,7 +358,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       }, base);
       try {
         if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para os avisos ao atendente");
-        await sendWhatsApp(s, channel, s.attendantNumber, `*Atendimento humano solicitado — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`);
+        await sendWhatsApp(s, channel, s.attendantNumber, `*Atendimento humano solicitado — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`, "notification");
         return "transferred-whatsapp";
       } catch (error) {
         await saveChat(msg.jid, (c) => {
@@ -393,7 +397,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 
   const answer = await generateReply(s, chat.messages, msg.text, route.companyId);
   if (!answer || answer.includes(TRANSFER_TOKEN)) return transfer();
-  const out = await reply(answer);
+  const out = await reply(answer, "ai");
   await saveChat(msg.jid, (c) => c.messages.push(userMsg, out), base);
   return "replied";
 }
@@ -506,7 +510,7 @@ export async function handleChatwootEvent(body: any) {
   if (body.event === "message_created") {
     if (body.message_type !== "outgoing" || body.private || !body.content) return "ignored";
     if (String(body.content).startsWith("Transferido pela IA")) return "ignored";
-    await sendWhatsApp(s, chat.channel, chat.number, String(body.content));
+    await sendWhatsApp(s, chat.channel, chat.number, String(body.content), "attendant");
     await updateConversations((c) => {
       c.chats[jid]?.messages.push({ role: "agent", content: String(body.content), at: now() });
     });
@@ -580,7 +584,7 @@ export async function agentSend(jid: string, text: string, media?: OutgoingMedia
     stored = { id, kind: media.kind, mimetype: media.mimetype, fileName: media.fileName };
   } else {
     if (!text.trim()) throw new Error("Mensagem vazia");
-    await sendWhatsApp(s, chat.channel, chat.number, text);
+    await sendWhatsApp(s, chat.channel, chat.number, text, "attendant");
   }
   await updateConversations((c) => {
     const ch = c.chats[jid];

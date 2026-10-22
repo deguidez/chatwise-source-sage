@@ -49,26 +49,26 @@ function InstallPage() {
   };
 
   const opt = (id: "mysql" | "file", Icon: typeof Database, title: string, desc: string) => (
-    <button type="button" onClick={() => setDriver(id)} className={cn("flex-1 rounded-xl border-2 p-4 text-left transition-colors", driver === id ? "border-primary bg-secondary" : "hover:bg-muted")}>
+    <Button variant="ghost" type="button" aria-pressed={driver === id} onClick={() => setDriver(id)} className={cn("block h-auto min-w-0 flex-1 whitespace-normal rounded-lg border-2 p-4 text-left transition-colors", driver === id ? "border-primary bg-secondary" : "hover:bg-muted")}>
       <Icon className="mb-2 h-5 w-5 text-primary" />
       <div className="font-semibold">{title}</div>
       <div className="text-xs text-muted-foreground">{desc}</div>
-    </button>
+    </Button>
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-sidebar px-4 py-10">
-      <form onSubmit={submit} className="w-full max-w-lg space-y-5 rounded-2xl bg-card p-8 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+    <div className="flex min-h-dvh items-center justify-center bg-sidebar px-4 py-6 sm:py-10">
+      <form onSubmit={submit} className="w-full min-w-0 max-w-lg space-y-5 rounded-lg bg-card p-5 shadow-xl sm:p-8">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
             <MessageCircle className="h-6 w-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-bold">Instalação</h1>
             <p className="text-sm text-muted-foreground">As tabelas são criadas automaticamente.</p>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           {opt("mysql", Database, "MySQL", "Recomendado para hospedagem")}
           {opt("file", HardDrive, "Arquivos", "Sem banco, salva em pasta")}
         </div>

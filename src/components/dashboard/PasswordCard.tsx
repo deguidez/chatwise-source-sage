@@ -9,7 +9,7 @@ export function PasswordCard({ username }: { username: string }) {
   const [pw, setPw] = useState({ current: "", next: "" });
 
   return (
-    <section className="rounded-xl border bg-card p-6">
+    <section className="min-w-0 space-y-3">
       <h2 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
         <Lock className="h-5 w-5" /> Minha conta
       </h2>
@@ -21,7 +21,7 @@ export function PasswordCard({ username }: { username: string }) {
         <Input type="password" placeholder="Nova senha (mín. 8)" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
       </div>
       <Button
-        className="mt-3"
+        className="mt-3 w-full sm:w-auto"
         variant="outline"
         disabled={!pw.current || pw.next.length < 8}
         onClick={async () => {

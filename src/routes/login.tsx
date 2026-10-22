@@ -51,13 +51,13 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-sidebar px-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-5 rounded-2xl bg-card p-8 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+    <div className="flex min-h-dvh items-center justify-center bg-sidebar px-4 py-6">
+      <form onSubmit={submit} className="w-full min-w-0 max-w-sm space-y-5 rounded-lg bg-card p-5 shadow-xl sm:p-8">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
             <MessageCircle className="h-6 w-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-bold">Agente WhatsApp</h1>
             <p className="text-sm text-muted-foreground">Acesse o painel administrativo</p>
           </div>
@@ -73,10 +73,10 @@ function LoginPage() {
           <Label htmlFor="pass">Senha</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input id="pass" className="px-9" type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <button type="button" aria-label={show ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <Input id="pass" className="pl-9 pr-12" type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Button variant="ghost" size="icon" type="button" aria-label={show ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShow(!show)} className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground">
               {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </div>
         {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}

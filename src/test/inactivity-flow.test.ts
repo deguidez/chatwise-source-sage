@@ -12,6 +12,7 @@ vi.mock("@/lib/store.server", () => ({
   getConversations: async () => structuredClone(state.conversations),
   getKnowledge: async () => [],
   updateKnowledge: async () => {},
+  recordMetric: async () => {},
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async (jid: string, time: number) => {
     const chat = state.conversations.chats[jid];

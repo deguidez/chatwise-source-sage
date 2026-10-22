@@ -18,3 +18,5 @@
 - Pure parsing/retrieval logic lives in src/lib/agent-core.ts so it stays unit-testable.
 - Inactivity uses persisted reminder claims in store.server.ts and a managed authenticated scheduled callback at /api/public/jobs/inactivity; do not use request-lifetime timers because reminders must work with the dashboard closed. Self-hosted schedulers call the same endpoint with LOVABLE_CRON_SECRET.
 - In-app attendance: queue tab derives from stage/ticketStatus/closed via queueTab in agent-core; attachments are stored as separate media-<uuid> documents through store.server (never inside conversations.json) so the conversation document stays small.
+- Dashboard navigation uses a mobile sheet below the desktop breakpoint; attendance keeps list and conversation as separate mobile views with independently scrolling messages and a viewport-height composer, so phone navigation and typing remain accessible.
+- Analytics are immutable per-event JSON documents accessed only through store.server.ts; token usage records provider-reported counts per attempt with shared logical request IDs, never prompts or keys, and reports enforce requireSuper on the server.

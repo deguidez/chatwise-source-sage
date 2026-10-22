@@ -297,6 +297,7 @@ export const testAgent = createServerFn({ method: "POST" })
       data.history.map((h) => ({ ...h, at: "" })),
       data.message,
       data.companyId || undefined,
+      "test",
     );
     return { reply };
   });
@@ -394,4 +395,18 @@ export const deleteQuickReply = createServerFn({ method: "POST" })
     await guard();
     await (await store()).updateQuickReplies((items) => items.filter((i) => i.id !== data.id));
     return { ok: true };
+  });
+
+export const loadMetrics = createServerFn({ method: "GET" })
+  .inputValidator(z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+  .handler(async ({ data }) => {
+    await guardSuper();
+    const from = Date.parse(data.from);
+    const to = Date.parse(data.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || to - from > 366 * 86400000) throw new Error("Escolha um período válido de até um ano");
+    const st = await store();
+    const [events, conversations, settings, users] = await Promise.all([st.getMetrics(data.from, data.to), st.getConversations(), st.getSettings(), st.getAuth()]);
+    const { queueTab } = await import("./agent-core");
+    const active = Object.values(conversations.chats).map((c) => ({ companyId: c.companyId || "", status: queueTab(c) }));
+    return { events, active, companies: settings.companies.map((c) => ({ id: c.id, name: c.name })), users: users.users.map((u) => ({ username: u.username, name: u.name || u.username })) };
   });

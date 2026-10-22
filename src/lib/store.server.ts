@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { isInactivityDue } from "./agent-core";
+import { metricDay, type MetricEvent } from "./metrics-core";
 
 export type Company = { id: string; name: string; prompt: string };
 
@@ -280,8 +281,24 @@ export const updateKnowledge = (fn: (items: KnowledgeItem[]) => KnowledgeItem[])
 
 export const getConversations = () =>
   readJson<Conversations>("conversations.json", { chats: {}, seenIds: [] });
-export const updateConversations = (fn: (c: Conversations) => void) =>
-  update<Conversations>("conversations.json", { chats: {}, seenIds: [] }, fn);
+export const updateConversations = async (fn: (c: Conversations) => void) => {
+  const events: Omit<MetricEvent, "id" | "at">[] = [];
+  const result = await update<Conversations>("conversations.json", { chats: {}, seenIds: [] }, (c) => {
+    const before = structuredClone(c.chats);
+    fn(c);
+    for (const [jid, chat] of Object.entries(c.chats)) {
+      const prev = before[jid];
+      const context = { companyId: chat.companyId || prev?.companyId, actor: chat.handledBy || prev?.handledBy, channel: chat.channel };
+      if (!prev || (prev.closed && !chat.closed)) events.push({ ...context, type: "started" });
+      if (!prev?.closed && chat.closed) events.push({ ...context, type: "resolved" });
+      if (prev?.stage !== "human" && chat.stage === "human") events.push({ ...context, type: "handoff" });
+      if (chat.ticketStatus === "open" && (prev?.ticketStatus !== "open" || prev.handledBy !== chat.handledBy)) events.push({ ...context, type: "assumed" });
+      if (prev?.stage === "human" && chat.stage !== "human" && !chat.closed) events.push({ ...context, type: "returned" });
+    }
+  });
+  for (const event of events) await recordMetric(event).catch(() => console.error("Falha ao gravar métrica de atendimento"));
+  return result;
+};
 
 /** Claim before sending; Cloud compare-and-swap prevents overlapping scheduled sends. */
 export async function claimInactivityReminder(jid: string, time: number): Promise<ChatState | null> {
@@ -346,3 +363,39 @@ export const getQuickReplies = async () =>
   (await readJson<{ items: QuickReply[] }>("quick-replies.json", { items: [] })).items;
 export const updateQuickReplies = (fn: (items: QuickReply[]) => QuickReply[]) =>
   update<{ items: QuickReply[] }>("quick-replies.json", { items: [] }, (d) => ({ items: fn(d.items) }));
+
+// Immutable metric documents avoid shared read-modify-write counters and retain history
+// independently of the conversation's 200-message cap. No content or credentials.
+export async function recordMetric(event: Omit<MetricEvent, "id" | "at"> & { at?: string; id?: string }) {
+  const at = event.at || new Date().toISOString();
+  const id = event.id || randomUUID();
+  const value: MetricEvent = { ...event, at, id };
+  await writeJson(`metric-${metricDay(at)}-${id}`, value);
+}
+
+export async function getMetrics(from: string, to: string): Promise<MetricEvent[]> {
+  const cfg = await requireConfig();
+  const low = `metric-${from}-`;
+  const high = `metric-${to}-~`;
+  if (cfg.driver === "cloud") {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const events: MetricEvent[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabaseAdmin.from("app_data").select("data").gte("name", low).lte("name", high).order("name").range(offset, offset + 999);
+      if (error) throw new Error("Não foi possível carregar os números");
+      events.push(...(data ?? []).map((row) => row.data as unknown as MetricEvent));
+      if (!data || data.length < 1000) break;
+    }
+    return events;
+  }
+  if (cfg.driver === "mysql") {
+    const [rows] = await (await mysqlPool(cfg)).query("SELECT data FROM app_data WHERE name >= ? AND name <= ? ORDER BY name", [low, high]);
+    return rows.map((row: { data: string }) => JSON.parse(row.data) as MetricEvent);
+  }
+  const files = await fs.readdir(dataDir()).catch(() => [] as string[]);
+  const events: MetricEvent[] = [];
+  for (const name of files.filter((name) => name >= low && name <= high && /^metric-\d{4}-\d{2}-\d{2}-[0-9a-f-]{36}$/.test(name))) {
+    events.push(JSON.parse(await fs.readFile(path.join(dataDir(), name), "utf8")) as MetricEvent);
+  }
+  return events;
+}

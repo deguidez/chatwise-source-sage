@@ -44,21 +44,21 @@ export function TestPanel() {
       </header>
       <div className="flex flex-wrap gap-2">
         {companies.map((c) => (
-          <button key={c.id} onClick={() => { setCompanyId(c.id); setMsgs([]); }} className={`rounded-full border px-3 py-1 text-sm transition-colors ${(companyId || companies[0]?.id) === c.id ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+          <Button variant="outline" key={c.id} aria-pressed={(companyId || companies[0]?.id) === c.id} onClick={() => { setCompanyId(c.id); setMsgs([]); }} className={`h-auto min-h-11 max-w-full whitespace-normal break-words border px-3 py-2 text-sm transition-colors ${(companyId || companies[0]?.id) === c.id ? "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted"}`}>
             {c.name}
-          </button>
+          </Button>
         ))}
       </div>
-      <div className="flex h-[60vh] flex-col rounded-2xl border bg-muted">
-        <div className="flex-1 space-y-2 overflow-y-auto p-4">
+      <div className="flex h-[60dvh] min-h-64 min-w-0 flex-col overflow-hidden rounded-lg border bg-muted">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 sm:p-4">
           {msgs.map((m, i) => (
-            <div key={i} className={cn("max-w-[80%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm shadow-sm", m.role === "user" ? "ml-auto bg-bubble-out" : "bg-bubble-in")}>
+            <div key={i} className={cn("max-w-[92%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm shadow-sm [overflow-wrap:anywhere] sm:max-w-[80%]", m.role === "user" ? "ml-auto bg-bubble-out" : "bg-bubble-in")}>
               {m.content}
             </div>
           ))}
           {busy && <div className="text-sm text-muted-foreground">digitando...</div>}
         </div>
-        <form onSubmit={send} className="flex gap-2 border-t bg-card p-3">
+        <form onSubmit={send} className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] gap-2 border-t bg-card p-3">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -70,7 +70,7 @@ export function TestPanel() {
             }}
             placeholder="Digite uma mensagem"
           />
-          <Button type="submit" size="icon" disabled={busy}><Send className="h-4 w-4" /></Button>
+          <Button type="submit" size="icon" aria-label="Enviar mensagem de teste" disabled={busy}><Send className="h-4 w-4" /></Button>
         </form>
       </div>
     </div>
