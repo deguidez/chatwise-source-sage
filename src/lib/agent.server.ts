@@ -106,7 +106,7 @@ async function cw(s: Settings, method: string, path: string, body?: unknown) {
   const res = await fetch(`${s.chatwootUrl.replace(/\/$/, "")}/api/v1/accounts/${s.chatwootAccountId}${path}`, {
     method,
     headers: { api_access_token: s.chatwootToken, "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`Chatwoot [${res.status}] ${path}: ${text.slice(0, 300)}`);

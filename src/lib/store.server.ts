@@ -37,7 +37,7 @@ export type KnowledgeItem = {
   title: string;
   content: string;
   /** Company this content belongs to; empty = shared by all. */
-  companyId?: string;
+  companyId?: string | undefined;
   createdAt: string;
 };
 
@@ -47,8 +47,8 @@ export type ChatState = {
   number: string;
   channel: "evolution" | "ycloud";
   stage: "menu" | "company" | "human";
-  companyId?: string;
-  chatwootConversationId?: number;
+  companyId?: string | undefined;
+  chatwootConversationId?: number | undefined;
   messages: ChatMessage[];
 };
 export type Conversations = {
@@ -67,11 +67,11 @@ export type AuthData = {
 // ---------- Install config (MySQL or local files) ----------
 export type DbConfig = {
   driver: "mysql" | "file";
-  host?: string;
-  port?: number;
-  database?: string;
-  user?: string;
-  password?: string;
+  host?: string | undefined;
+  port?: number | undefined;
+  database?: string | undefined;
+  user?: string | undefined;
+  password?: string | undefined;
 };
 
 const dataDir = () => process.env["DATA_DIR"] || path.join(process.cwd(), "data");
