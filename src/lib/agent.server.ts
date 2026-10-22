@@ -162,6 +162,22 @@ async function forwardToChatwoot(s: Settings, conversationId: number, text: stri
 
 // ---------------- Main flow ----------------
 const now = () => new Date().toISOString();
+const STAFF_CLOSED_NOTE = "Atendimento encerrado pelo atendente.";
+
+/** Store what the attendant typed on the company phone during a same-WhatsApp handoff. */
+export async function recordStaffMessage(jid: string, text: string) {
+  let saved = false;
+  await updateConversations((c) => {
+    const chat = c.chats[jid];
+    if (!chat || chat.stage !== "human" || chat.handoffProvider !== "whatsapp") return;
+    // Our own automatic messages also echo back as "sent by the company"; skip them.
+    if (chat.messages.slice(-6).some((m) => m.role === "assistant" && m.content === text)) return;
+    chat.messages.push({ role: "agent", content: text, at: now() });
+    chat.messages = chat.messages.slice(-60);
+    saved = true;
+  });
+  return saved ? "staff-recorded" : "ignored";
+}
 export const HUMAN_WAIT_MESSAGE = "Seu atendimento já foi encaminhado. Um atendente irá te atender em instantes. 🙂";
 
 async function saveChat(jid: string, fn: (c: ChatState) => void, base: ChatState) {
@@ -370,21 +386,42 @@ export async function sendInactivityReminders(time = Date.now()) {
   return { sent, failed, closed: closedCount };
 }
 
+/** Automatic learning: the attendant's answers become knowledge for the AI next time. */
+export async function learnFromChat(chat: ChatState | undefined) {
+  if (!chat) return false;
+  const recent = chat.messages.slice(-30);
+  const first = recent.findIndex((m) => m.role === "agent" && m.content !== STAFF_CLOSED_NOTE);
+  if (first < 0) return false;
+  const lines = recent.slice(Math.max(0, first - 3))
+    .filter((m) => m.role !== "assistant" && m.content !== STAFF_CLOSED_NOTE)
+    .map((m) => `${m.role === "user" ? "Pergunta do cliente" : "Resposta do atendente"}: ${m.content}`);
+  if (!lines.some((l) => l.startsWith("Resposta"))) return false;
+  const date = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  await updateKnowledge((items) => [
+    ...items,
+    { id: crypto.randomUUID(), type: "text", title: `Aprendido com atendimento — ${chat.name || chat.number} (${date})`, content: lines.join("\n").slice(0, 6000), companyId: chat.companyId, createdAt: now() },
+  ]);
+  return true;
+}
+
 /** Attendant ends a same-WhatsApp handoff by sending the closing phrase from the company phone. */
 export async function closeByStaff(jid: string) {
   let closed = false;
+  let snapshot: ChatState | undefined;
   await updateConversations((c) => {
     const chat = c.chats[jid];
     if (!chat || chat.stage !== "human" || chat.handoffProvider !== "whatsapp") return;
+    snapshot = structuredClone(chat);
     chat.stage = "menu";
     chat.closed = true;
     chat.companyId = undefined;
     chat.handoffProvider = undefined;
     chat.handoffNotificationError = undefined;
     chat.inactivityReminderAt = undefined;
-    chat.messages.push({ role: "agent", content: "Atendimento encerrado pelo atendente.", at: now() });
+    chat.messages.push({ role: "agent", content: STAFF_CLOSED_NOTE, at: now() });
     closed = true;
   });
+  if (closed) await learnFromChat(snapshot).catch((e) => console.error("Aprendizado falhou:", e));
   return closed ? "closed-by-staff" : "ignored";
 }
 
@@ -411,15 +448,18 @@ export async function handleChatwootEvent(body: any) {
 
   if (body.event === "conversation_status_changed" || body.event === "conversation_resolved") {
     if (body.status !== "resolved" && body.event !== "conversation_resolved") return "ignored";
+    let snapshot: ChatState | undefined;
     await updateConversations((c) => {
       const ch = c.chats[jid];
       if (!ch) return;
+      snapshot = structuredClone(ch);
       ch.stage = "menu";
       ch.companyId = undefined;
       ch.chatwootConversationId = undefined;
       ch.handoffProvider = undefined;
       ch.handoffNotificationError = undefined;
     });
+    await learnFromChat(snapshot).catch((e) => console.error("Aprendizado falhou:", e));
     return "returned-to-ai";
   }
   return "ignored";
@@ -427,13 +467,16 @@ export async function handleChatwootEvent(body: any) {
 
 /** Manually give a chat back to the AI from the dashboard. */
 export async function returnToAI(jid: string) {
+  let snapshot: ChatState | undefined;
   await updateConversations((c) => {
     const ch = c.chats[jid];
     if (!ch) return;
+    if (ch.stage === "human") snapshot = structuredClone(ch);
     ch.stage = "menu";
     ch.companyId = undefined;
     ch.chatwootConversationId = undefined;
     ch.handoffProvider = undefined;
     ch.handoffNotificationError = undefined;
   });
+  await learnFromChat(snapshot).catch((e) => console.error("Aprendizado falhou:", e));
 }
