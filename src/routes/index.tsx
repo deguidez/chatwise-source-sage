@@ -1,12 +1,13 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, BookOpen, KeyRound, LogOut, MessageCircle, MessagesSquare, FlaskConical, Zap } from "lucide-react";
+import { Building2, BookOpen, KeyRound, LogOut, MessageCircle, MessagesSquare, FlaskConical, Users, Zap } from "lucide-react";
 import { getAuthState, logout } from "@/lib/api.functions";
 import { KnowledgePanel } from "@/components/dashboard/KnowledgePanel";
 import { SettingsPanel } from "@/components/dashboard/SettingsPanel";
 import { ConversationsPanel } from "@/components/dashboard/ConversationsPanel";
 import { CompaniesPanel } from "@/components/dashboard/CompaniesPanel";
 import { QuickRepliesPanel } from "@/components/dashboard/QuickRepliesPanel";
+import { UsersPanel } from "@/components/dashboard/UsersPanel";
 import { TestPanel } from "@/components/dashboard/TestPanel";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/")({
   beforeLoad: async () => {
     const s = await getAuthState();
     if (!s.loggedIn) throw redirect({ to: "/login" });
+    return { auth: s };
   },
   component: Dashboard,
 });
