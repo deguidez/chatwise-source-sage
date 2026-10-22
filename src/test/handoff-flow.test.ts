@@ -12,7 +12,7 @@ vi.mock("@/lib/store.server", () => ({
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async () => null,
 }));
-import { handleIncoming, handleChatwootEvent, returnToAI, sendInactivityReminders } from "@/lib/agent.server";
+import { HUMAN_WAIT_MESSAGE, handleIncoming, handleChatwootEvent, returnToAI, sendInactivityReminders } from "@/lib/agent.server";
 
 const jid = "5511999990000@s.whatsapp.net";
 const incoming = (text: string, id: string) => ({ id, jid, number: "5511999990000", name: "Cliente teste", text, isGroup: false });
@@ -41,8 +41,11 @@ describe("same-number WhatsApp handoff", () => {
     state.settings.handoffProvider = "chatwoot";
     await handleIncoming(incoming("mais uma dúvida", "2"), "evolution");
     expect(await sendInactivityReminders(Date.now() + 120000)).toMatchObject({ sent: 0, failed: 0 });
+    // Only the waiting notice goes to the customer; the AI does not answer.
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(call[1].body).text)).toEqual([HUMAN_WAIT_MESSAGE]);
+    fetchMock.mockClear();
+    await handleIncoming(incoming("alô?", "3"), "evolution");
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(state.conversations.chats[jid]?.messages.at(-1)?.role).toBe("user");
   });
   it("resumes the menu only after manual return", async () => {
     await handleIncoming(incoming("atendente", "1"), "evolution");
