@@ -22,7 +22,7 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
     let body = "";
     for (let i = 0; i < attempts.length; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i])}:generateContent`, {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i] ?? primary)}:generateContent`, {
         method: "POST",
         headers: { "x-goog-api-key": s.geminiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
