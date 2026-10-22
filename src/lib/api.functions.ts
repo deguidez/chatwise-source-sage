@@ -60,6 +60,35 @@ export const changePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const listUsers = createServerFn({ method: "GET" }).handler(async () => (await auth()).listUsers());
+
+export const createUser = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      username: z.string().min(3).max(30),
+      password: z.string().min(8).max(200),
+      role: z.enum(["super", "attendant"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await (await auth()).createUser(data.username, data.password, data.role);
+    return { ok: true };
+  });
+
+export const deleteUser = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30) }))
+  .handler(async ({ data }) => {
+    await (await auth()).deleteUser(data.username);
+    return { ok: true };
+  });
+
+export const resetUserPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30), password: z.string().min(8).max(200) }))
+  .handler(async ({ data }) => {
+    await (await auth()).resetUserPassword(data.username, data.password);
+    return { ok: true };
+  });
+
 export const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
   await guardSuper();
   const s = await (await store()).getSettings();
