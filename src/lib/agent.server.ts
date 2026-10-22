@@ -23,7 +23,7 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
     let res!: Response;
     let body = "";
     for (let i = 0; i < attempts.length; i++) {
-      if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
+      if (i > 0) await new Promise((r) => setTimeout(r, 800));
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(attempts[i] ?? primary)}:generateContent`, {
         method: "POST",
         headers: { "x-goog-api-key": s.geminiKey, "Content-Type": "application/json" },
@@ -34,6 +34,8 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
       });
       body = await res.text();
       if (res.ok || ![429, 500, 503, 404].includes(res.status)) break;
+      // Quota exhausted: retrying wastes time, go straight to the backup.
+      if (res.status === 429 && body.includes("quota") && s.openaiKey) break;
     }
     if (!res.ok) {
       console.error(`Gemini falhou [${res.status}]: ${body.slice(0, 500)}`);
