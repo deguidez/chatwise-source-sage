@@ -66,7 +66,7 @@ export type AuthData = {
 
 // ---------- Install config (MySQL or local files) ----------
 export type DbConfig = {
-  driver: "mysql" | "file";
+  driver: "mysql" | "file" | "cloud";
   host?: string | undefined;
   port?: number | undefined;
   database?: string | undefined;
@@ -78,6 +78,10 @@ const dataDir = () => process.env["DATA_DIR"] || path.join(process.cwd(), "data"
 const configFile = () => path.join(dataDir(), "config.json");
 
 export async function getDbConfig(): Promise<DbConfig | null> {
+  // Hosted on Lovable: use Lovable Cloud automatically (no install step).
+  if (!process.env["DB_HOST"] && process.env["SUPABASE_URL"] && process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+    return { driver: "cloud" };
+  }
   if (process.env["DB_HOST"] && process.env["DB_NAME"]) {
     return {
       driver: "mysql",
@@ -151,6 +155,12 @@ async function readJson<T>(name: string, fallback: T): Promise<T> {
   const cfg = await requireConfig();
   try {
     let raw: string | undefined;
+    if (cfg.driver === "cloud") {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin.from("app_data").select("data").eq("name", name).maybeSingle();
+      if (error) throw new Error(`Banco: ${error.message}`);
+      return data ? ({ ...fallback, ...(data.data as object) } as T) : fallback;
+    }
     if (cfg.driver === "mysql") {
       const [rows] = await (await mysqlPool(cfg)).query("SELECT data FROM app_data WHERE name = ?", [name]);
       raw = rows[0]?.data;
@@ -167,6 +177,14 @@ async function readJson<T>(name: string, fallback: T): Promise<T> {
 async function writeJson(name: string, data: unknown) {
   const cfg = await requireConfig();
   const json = JSON.stringify(data);
+  if (cfg.driver === "cloud") {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("app_data")
+      .upsert({ name, data: JSON.parse(json), updated_at: new Date().toISOString() });
+    if (error) throw new Error(`Banco: ${error.message}`);
+    return;
+  }
   if (cfg.driver === "mysql") {
     await (await mysqlPool(cfg)).query(
       "INSERT INTO app_data (name, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)",
