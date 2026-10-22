@@ -284,7 +284,7 @@ export async function sendInactivityReminders(time = Date.now()) {
       failed++;
       await updateConversations((c) => {
         const latest = c.chats[jid];
-        if (latest?.inactivityReminderAt === chat.inactivityReminderAt) latest.inactivityReminderAt = undefined;
+        if (latest && latest.inactivityReminderAt === chat.inactivityReminderAt) latest.inactivityReminderAt = undefined;
       });
     }
   }
