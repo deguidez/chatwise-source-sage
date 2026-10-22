@@ -4,7 +4,6 @@
 services:
   app:
     build: .
-    image: fotogrer-agent:latest
     restart: unless-stopped
     environment:
       DB_HOST: mysql

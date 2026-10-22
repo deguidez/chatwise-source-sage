@@ -25,6 +25,7 @@ No Portainer, abra a stack e clique em **Pull and redeploy**.
 
 ## Problemas comuns
 
+- **"pull access denied":** o Portainer não construiu a imagem. Confira se a stack usa o arquivo `docker-compose.yml` deste repositório (que tem `build: .`). Se persistir, construa manualmente: no terminal da VPS, clone o repositório, rode `docker build -t fotogrer-agent .` dentro da pasta e, no Portainer, use "Web editor" apontando `image: fotogrer-agent`.
 - **Rede não encontrada:** confira com `docker network ls` se o nome da rede do Traefik é `OrionNet` (sua rede atual é OrionNet).
 - **Erro de certificado / 404:** confira o domínio, o DNS e os nomes do Traefik.
 - **Nunca apague os volumes** `mysql_data` e `app_data`: eles guardam seus dados.
