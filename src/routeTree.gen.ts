@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InstallRouteImport } from './routes/install'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ApiPublicChatwootWebhookRouteImport } from './routes/api/public/chatwoot/webhook'
 import { Route as ApiPublicEvolutionWebhookRouteImport } from './routes/api/public/evolution/webhook'
+import { Route as ApiPublicYcloudWebhookRouteImport } from './routes/api/public/ycloud/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,45 +31,83 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicChatwootWebhookRoute =
+  ApiPublicChatwootWebhookRouteImport.update({
+    id: '/api/public/chatwoot/webhook',
+    path: '/api/public/chatwoot/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicEvolutionWebhookRoute =
   ApiPublicEvolutionWebhookRouteImport.update({
     id: '/api/public/evolution/webhook',
     path: '/api/public/evolution/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicYcloudWebhookRoute = ApiPublicYcloudWebhookRouteImport.update({
+  id: '/api/public/ycloud/webhook',
+  path: '/api/public/ycloud/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/install': typeof InstallRoute
   '/login': typeof LoginRoute
+  '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/install': typeof InstallRoute
   '/login': typeof LoginRoute
+  '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/install': typeof InstallRoute
   '/login': typeof LoginRoute
+  '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/install' | '/login' | '/api/public/evolution/webhook'
+  fullPaths:
+    | '/'
+    | '/install'
+    | '/login'
+    | '/api/public/chatwoot/webhook'
+    | '/api/public/evolution/webhook'
+    | '/api/public/ycloud/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/install' | '/login' | '/api/public/evolution/webhook'
-  id: '__root__' | '/' | '/install' | '/login' | '/api/public/evolution/webhook'
+  to:
+    | '/'
+    | '/install'
+    | '/login'
+    | '/api/public/chatwoot/webhook'
+    | '/api/public/evolution/webhook'
+    | '/api/public/ycloud/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/install'
+    | '/login'
+    | '/api/public/chatwoot/webhook'
+    | '/api/public/evolution/webhook'
+    | '/api/public/ycloud/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   InstallRoute: typeof InstallRoute
   LoginRoute: typeof LoginRoute
+  ApiPublicChatwootWebhookRoute: typeof ApiPublicChatwootWebhookRoute
   ApiPublicEvolutionWebhookRoute: typeof ApiPublicEvolutionWebhookRoute
+  ApiPublicYcloudWebhookRoute: typeof ApiPublicYcloudWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -93,11 +133,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/chatwoot/webhook': {
+      id: '/api/public/chatwoot/webhook'
+      path: '/api/public/chatwoot/webhook'
+      fullPath: '/api/public/chatwoot/webhook'
+      preLoaderRoute: typeof ApiPublicChatwootWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/evolution/webhook': {
       id: '/api/public/evolution/webhook'
       path: '/api/public/evolution/webhook'
       fullPath: '/api/public/evolution/webhook'
       preLoaderRoute: typeof ApiPublicEvolutionWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ycloud/webhook': {
+      id: '/api/public/ycloud/webhook'
+      path: '/api/public/ycloud/webhook'
+      fullPath: '/api/public/ycloud/webhook'
+      preLoaderRoute: typeof ApiPublicYcloudWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -107,7 +161,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   InstallRoute: InstallRoute,
   LoginRoute: LoginRoute,
+  ApiPublicChatwootWebhookRoute: ApiPublicChatwootWebhookRoute,
   ApiPublicEvolutionWebhookRoute: ApiPublicEvolutionWebhookRoute,
+  ApiPublicYcloudWebhookRoute: ApiPublicYcloudWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

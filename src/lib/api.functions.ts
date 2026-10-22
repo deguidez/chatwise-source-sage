@@ -66,10 +66,33 @@ export const loadSettings = createServerFn({ method: "GET" }).handler(async () =
     ...s,
     openaiKey: mask(s.openaiKey),
     evolutionKey: mask(s.evolutionKey),
+    geminiKey: mask(s.geminiKey),
+    ycloudKey: mask(s.ycloudKey),
+    chatwootToken: mask(s.chatwootToken),
   };
 });
 
+const SECRET_KEYS = ["openaiKey", "evolutionKey", "geminiKey", "ycloudKey", "chatwootToken"];
+const str = (n = 500) => z.string().max(n).optional();
 const settingsSchema = z.object({
+  aiProvider: z.enum(["openai", "gemini", "ollama"]).optional(),
+  geminiKey: str(),
+  geminiModel: str(100),
+  ollamaUrl: str(),
+  ollamaModel: str(100),
+  waProvider: z.enum(["evolution", "ycloud"]).optional(),
+  ycloudKey: str(),
+  ycloudFrom: str(50),
+  chatwootUrl: str(),
+  chatwootAccountId: str(20),
+  chatwootToken: str(),
+  chatwootInboxId: str(20),
+  greeting: str(2000),
+  humanOption: z.boolean().optional(),
+  companies: z
+    .array(z.object({ id: z.string().min(1).max(60), name: z.string().min(1).max(100), prompt: z.string().max(10000) }))
+    .max(10)
+    .optional(),
   openaiKey: z.string().max(500).optional(),
   openaiModel: z.string().max(100).optional(),
   evolutionUrl: z.string().max(500).optional(),
@@ -88,7 +111,7 @@ export const saveSettings = createServerFn({ method: "POST" })
       for (const [k, v] of Object.entries(data)) {
         if (v === undefined) continue;
         // Masked/empty secret fields mean "keep current value"
-        if ((k === "openaiKey" || k === "evolutionKey") && (v === "" || String(v).startsWith("••••")))
+        if (SECRET_KEYS.includes(k) && (v === "" || String(v).startsWith("••••")))
           continue;
         (s as any)[k] = typeof v === "string" ? v.trim() : v;
       }
@@ -103,18 +126,19 @@ export const listKnowledge = createServerFn({ method: "GET" }).handler(async () 
     id: i.id,
     type: i.type,
     title: i.title,
+    companyId: i.companyId ?? "",
     size: i.content.length,
     preview: i.content.slice(0, 200),
     createdAt: i.createdAt,
   }));
 });
 
-async function addItem(type: "text" | "pdf" | "url" | "file", title: string, content: string) {
+async function addItem(type: "text" | "pdf" | "url" | "file", title: string, content: string, companyId = "") {
   const text = content.trim();
   if (!text) throw new Error("Nenhum texto encontrado nesse conteúdo");
   const { randomUUID } = await import("node:crypto");
   await (await store()).updateKnowledge((items) => [
-    { id: randomUUID(), type, title: title.slice(0, 200) || "Sem título", content: text, createdAt: new Date().toISOString() },
+    { id: randomUUID(), type, title: title.slice(0, 200) || "Sem título", content: text, companyId: companyId || undefined, createdAt: new Date().toISOString() },
     ...items,
   ]);
   return { ok: true };
@@ -126,33 +150,34 @@ export const addText = createServerFn({ method: "POST" })
       title: z.string().max(200),
       content: z.string().min(1).max(2_000_000),
       type: z.enum(["text", "file"]).default("text"),
+      companyId: z.string().max(60).default(""),
     }),
   )
   .handler(async ({ data }) => {
     await guard();
-    return addItem(data.type, data.title, data.content);
+    return addItem(data.type, data.title, data.content, data.companyId);
   });
 
 export const addUrl = createServerFn({ method: "POST" })
-  .validator(z.object({ url: z.string().url().max(2000) }))
+  .validator(z.object({ url: z.string().url().max(2000), companyId: z.string().max(60).default("") }))
   .handler(async ({ data }) => {
     await guard();
     const { htmlToText } = await import("./agent-core");
     const res = await fetch(data.url, { headers: { "User-Agent": "Mozilla/5.0 WhatsAgent" } });
     if (!res.ok) throw new Error(`Não foi possível abrir o site (${res.status})`);
     const { title, text } = htmlToText(await res.text());
-    return addItem("url", title || data.url, `Fonte: ${data.url}\n\n${text}`);
+    return addItem("url", title || data.url, `Fonte: ${data.url}\n\n${text}`, data.companyId);
   });
 
 export const addPdf = createServerFn({ method: "POST" })
-  .validator(z.object({ name: z.string().max(300), base64: z.string().max(30_000_000) }))
+  .validator(z.object({ name: z.string().max(300), base64: z.string().max(30_000_000), companyId: z.string().max(60).default("") }))
   .handler(async ({ data }) => {
     await guard();
     const { extractText, getDocumentProxy } = await import("unpdf");
     const bytes = Uint8Array.from(Buffer.from(data.base64, "base64"));
     const pdf = await getDocumentProxy(bytes);
     const { text } = await extractText(pdf, { mergePages: true });
-    return addItem("pdf", data.name, Array.isArray(text) ? text.join("\n\n") : text);
+    return addItem("pdf", data.name, Array.isArray(text) ? text.join("\n\n") : text, data.companyId);
   });
 
 export const deleteKnowledge = createServerFn({ method: "POST" })
@@ -167,7 +192,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
@@ -175,6 +200,7 @@ export const testAgent = createServerFn({ method: "POST" })
   .validator(
     z.object({
       message: z.string().min(1).max(4000),
+      companyId: z.string().max(60).default(""),
       history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() })).max(20),
     }),
   )
@@ -186,6 +212,15 @@ export const testAgent = createServerFn({ method: "POST" })
       settings,
       data.history.map((h) => ({ ...h, at: "" })),
       data.message,
+      data.companyId || undefined,
     );
     return { reply };
+  });
+
+export const returnChatToAI = createServerFn({ method: "POST" })
+  .validator(z.object({ jid: z.string().max(200) }))
+  .handler(async ({ data }) => {
+    await guard();
+    await (await import("./agent.server")).returnToAI(data.jid);
+    return { ok: true };
   });

@@ -1,10 +1,11 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen, KeyRound, LogOut, MessageCircle, MessagesSquare, FlaskConical } from "lucide-react";
+import { Building2, BookOpen, KeyRound, LogOut, MessageCircle, MessagesSquare, FlaskConical } from "lucide-react";
 import { getAuthState, logout } from "@/lib/api.functions";
 import { KnowledgePanel } from "@/components/dashboard/KnowledgePanel";
 import { SettingsPanel } from "@/components/dashboard/SettingsPanel";
 import { ConversationsPanel } from "@/components/dashboard/ConversationsPanel";
+import { CompaniesPanel } from "@/components/dashboard/CompaniesPanel";
 import { TestPanel } from "@/components/dashboard/TestPanel";
 import { cn } from "@/lib/utils";
 
@@ -25,14 +26,15 @@ export const Route = createFileRoute("/")({
 });
 
 const tabs = [
+  { id: "companies", label: "Empresas e menu", icon: Building2 },
   { id: "knowledge", label: "Conhecimento", icon: BookOpen },
-  { id: "settings", label: "Chaves e agente", icon: KeyRound },
+  { id: "settings", label: "Chaves e conexões", icon: KeyRound },
   { id: "test", label: "Testar", icon: FlaskConical },
   { id: "chats", label: "Conversas", icon: MessagesSquare },
 ] as const;
 
 function Dashboard() {
-  const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("knowledge");
+  const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("companies");
   const router = useRouter();
 
   return (
@@ -70,6 +72,7 @@ function Dashboard() {
       </aside>
       <main className="flex-1 p-6 md:p-10">
         <div className="mx-auto max-w-4xl">
+          {tab === "companies" && <CompaniesPanel />}
           {tab === "knowledge" && <KnowledgePanel />}
           {tab === "settings" && <SettingsPanel />}
           {tab === "test" && <TestPanel />}
