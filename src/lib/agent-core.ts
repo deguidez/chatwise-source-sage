@@ -193,3 +193,22 @@ export function routeMessage(
   if (wantsHuman(text)) return { kind: "human" };
   return { kind: "menu" };
 }
+
+/** Message the business itself sent from its own WhatsApp (attendant typing on the phone). */
+export function parseEvolutionOwnMessage(body: any): { jid: string; text: string } | null {
+  if (!body || typeof body !== "object") return null;
+  const event = String(body.event ?? "").toLowerCase().replace(/_/g, ".");
+  if (event !== "messages.upsert") return null;
+  const data = Array.isArray(body.data) ? body.data[0] : body.data;
+  if (!data?.key?.fromMe) return null;
+  const jid: string = data.key.remoteJid ?? "";
+  if (!jid || jid.endsWith("@g.us") || jid === "status@broadcast") return null;
+  const m = data.message ?? {};
+  const text: string = m.conversation ?? m.extendedTextMessage?.text ?? "";
+  return text.trim() ? { jid, text: text.trim() } : null;
+}
+
+/** Attendant phrase that ends a human conversation, e.g. "Irei encerrar o seu atendimento". */
+export function isStaffCloseCommand(text: string): boolean {
+  return /\bencerr(ar|ando|o|ei)\b.{0,15}\batendimento\b/.test(norm(text));
+}

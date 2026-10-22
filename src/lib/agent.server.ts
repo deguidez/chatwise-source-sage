@@ -366,6 +366,24 @@ export async function sendInactivityReminders(time = Date.now()) {
   return { sent, failed, closed: closedCount };
 }
 
+/** Attendant ends a same-WhatsApp handoff by sending the closing phrase from the company phone. */
+export async function closeByStaff(jid: string) {
+  let closed = false;
+  await updateConversations((c) => {
+    const chat = c.chats[jid];
+    if (!chat || chat.stage !== "human" || chat.handoffProvider !== "whatsapp") return;
+    chat.stage = "menu";
+    chat.closed = true;
+    chat.companyId = undefined;
+    chat.handoffProvider = undefined;
+    chat.handoffNotificationError = undefined;
+    chat.inactivityReminderAt = undefined;
+    chat.messages.push({ role: "agent", content: "Atendimento encerrado pelo atendente.", at: now() });
+    closed = true;
+  });
+  return closed ? "closed-by-staff" : "ignored";
+}
+
 /** Chatwoot events: attendant replies go to WhatsApp; resolving gives the chat back to the AI. */
 export async function handleChatwootEvent(body: any) {
   const s = await getSettings();

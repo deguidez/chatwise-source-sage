@@ -96,3 +96,16 @@ describe("transfer to another number", () => {
     expect(await handleIncoming(incoming("oi", "2"), "evolution")).toBe("menu");
   });
 });
+
+describe("attendant closes from the company phone", () => {
+  it("'irei encerrar o seu atendimento' ends the handoff and the next message gets the menu", async () => {
+    const { isStaffCloseCommand } = await import("@/lib/agent-core");
+    const { closeByStaff } = await import("@/lib/agent.server");
+    expect(isStaffCloseCommand("Obrigado! Irei encerrar o seu atendimento.")).toBe(true);
+    expect(isStaffCloseCommand("Já te passo o valor")).toBe(false);
+    await handleIncoming(incoming("atendente", "1"), "evolution");
+    expect(await closeByStaff(jid)).toBe("closed-by-staff");
+    expect(state.conversations.chats[jid]?.stage).toBe("menu");
+    expect(await handleIncoming(incoming("oi", "2"), "evolution")).toBe("menu");
+  });
+});
