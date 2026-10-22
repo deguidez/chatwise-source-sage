@@ -67,3 +67,13 @@ describe("inactivity conversation flow", () => {
     expect(await sendInactivityReminders(start + 180000)).toMatchObject({ sent: 1, failed: 0 });
   });
 });
+it("finaliza o atendimento 1 minuto depois da pergunta sem resposta", async () => {
+  await sendInactivityReminders(start + 120000);
+  const chat = state.conversations.chats[jid]!;
+  chat.messages.at(-1)!.at = new Date(start + 120000).toISOString();
+  expect(await sendInactivityReminders(start + 179999)).toMatchObject({ closed: 0 });
+  expect(await sendInactivityReminders(start + 180000)).toMatchObject({ closed: 1 });
+  expect(chat.closed).toBe(true);
+  expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body).text).toContain("atendimento foi finalizado");
+  expect(await sendInactivityReminders(start + 600000)).toMatchObject({ sent: 0, closed: 0 });
+});
