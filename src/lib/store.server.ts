@@ -30,7 +30,7 @@ export type Conversations = {
 
 export type AuthData = { passwordHash: string; salt: string; sessions: string[] };
 
-const dataDir = () => process.env.DATA_DIR || path.join(process.cwd(), "data");
+const dataDir = () => process.env["DATA_DIR"] || path.join(process.cwd(), "data");
 
 const locks = new Map<string, Promise<unknown>>();
 

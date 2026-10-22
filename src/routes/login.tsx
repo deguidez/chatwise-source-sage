@@ -32,7 +32,10 @@ function LoginPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasPassword && password !== confirm) return toast.error("As senhas não conferem");
+    if (!hasPassword && password !== confirm) {
+      toast.error("As senhas não conferem");
+      return;
+    }
     setBusy(true);
     try {
       if (hasPassword) await login({ data: { password } });
