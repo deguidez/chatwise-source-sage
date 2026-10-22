@@ -1,31 +1,33 @@
-# Stack para Portainer + Traefik.
-# Troque: SEU_DOMINIO, senhas e o nome da rede/certresolver do seu Traefik.
+# Portainer em Docker Standalone. Construa a imagem na VPS antes do Deploy.
 services:
   app:
-    build: .
-    image: whatsagent:latest
+    image: fotogrer-agent:latest
+    pull_policy: never
     restart: unless-stopped
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_NAME: whatsagent
       DB_USER: whatsagent
-      DB_PASSWORD: TROQUE_SENHA_DB
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no Portainer}
       COOKIE_SECURE: "true"
-      LOVABLE_CRON_SECRET: TROQUE_SEGREDO_CRON
+      LOVABLE_CRON_SECRET: ${LOVABLE_CRON_SECRET:?Defina LOVABLE_CRON_SECRET no Portainer}
     volumes:
       - app_data:/app/data
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - interna
       - traefik_public
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik_public
-      - traefik.http.routers.whatsagent.rule=Host(`SEU_DOMINIO`)
-      - traefik.http.routers.whatsagent.entrypoints=websecure
-      - traefik.http.routers.whatsagent.tls.certresolver=letsencrypt
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik_public}
+      - traefik.http.routers.whatsagent.rule=Host(`agente.evenon.com.br`)
+      - traefik.http.routers.whatsagent.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.whatsagent.tls=true
+      - traefik.http.routers.whatsagent.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.whatsagent.service=whatsagent
       - traefik.http.services.whatsagent.loadbalancer.server.port=3000
 
   mysql:
@@ -34,20 +36,31 @@ services:
     environment:
       MYSQL_DATABASE: whatsagent
       MYSQL_USER: whatsagent
-      MYSQL_PASSWORD: TROQUE_SENHA_DB
-      MYSQL_ROOT_PASSWORD: TROQUE_SENHA_ROOT
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no Portainer}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no Portainer}
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - interna
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h 127.0.0.1 -u\"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
   # Lembrete de inatividade: chama o sistema a cada minuto
   cron:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.12.1
     restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c", "while true; do curl -s -X POST -H 'Authorization: Bearer TROQUE_SEGREDO_CRON' http://app:3000/api/public/jobs/inactivity >/dev/null; sleep 60; done"]
+    environment:
+      LOVABLE_CRON_SECRET: ${LOVABLE_CRON_SECRET:?Defina LOVABLE_CRON_SECRET no Portainer}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'while true; do curl --fail --silent --show-error --connect-timeout 10 --max-time 50 -X POST -H "Authorization: Bearer $$LOVABLE_CRON_SECRET" http://app:3000/api/public/jobs/inactivity || echo "Falha na rotina de inatividade" >&2; sleep 60; done'
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - interna
 
@@ -59,3 +72,4 @@ networks:
   interna:
   traefik_public:
     external: true
+    name: ${TRAEFIK_NETWORK:-traefik_public}
