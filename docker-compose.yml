@@ -21,10 +21,10 @@ services:
         condition: service_healthy
     networks:
       - interna
-      - traefik_public
+      - OrionNet
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik_public
+      - traefik.docker.network=OrionNet
       - traefik.http.routers.whatsagent.rule=Host(`SEU_DOMINIO`)
       - traefik.http.routers.whatsagent.entrypoints=websecure
       - traefik.http.routers.whatsagent.tls=true
@@ -72,5 +72,5 @@ volumes:
 
 networks:
   interna:
-  traefik_public:
+  OrionNet:
     external: true
