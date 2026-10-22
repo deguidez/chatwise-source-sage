@@ -31,15 +31,19 @@ export const Route = createFileRoute("/")({
 });
 
 const tabs = [
-  { id: "chats", label: "Atendimento", icon: MessagesSquare },
-  { id: "quick", label: "Respostas rápidas", icon: Zap },
-  { id: "companies", label: "Empresas e menu", icon: Building2 },
-  { id: "knowledge", label: "Conhecimento", icon: BookOpen },
-  { id: "settings", label: "Chaves e conexões", icon: KeyRound },
-  { id: "test", label: "Testar", icon: FlaskConical },
+  { id: "chats", label: "Atendimento", icon: MessagesSquare, superOnly: false },
+  { id: "quick", label: "Respostas rápidas", icon: Zap, superOnly: false },
+  { id: "companies", label: "Empresas e menu", icon: Building2, superOnly: false },
+  { id: "knowledge", label: "Conhecimento", icon: BookOpen, superOnly: false },
+  { id: "settings", label: "Chaves e conexões", icon: KeyRound, superOnly: true },
+  { id: "users", label: "Usuários", icon: Users, superOnly: true },
+  { id: "test", label: "Testar", icon: FlaskConical, superOnly: false },
 ] as const;
 
 function Dashboard() {
+  const { auth } = Route.useRouteContext();
+  const isSuper = auth.role === "super";
+  const visibleTabs = tabs.filter((t) => !t.superOnly || isSuper);
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("chats");
   const router = useRouter();
 
