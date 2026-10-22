@@ -234,6 +234,10 @@ export async function recordStaffMessage(jid: string, text: string) {
     chat.messages = chat.messages.slice(-200);
     saved = true;
   });
+  if (saved) {
+    const chat = (await getConversations()).chats[jid];
+    await captureMetric({ type: "sent", source: "attendant", channel: chat?.channel, companyId: chat?.companyId, actor: chat?.handledBy, mediaKind: "text" });
+  }
   return saved ? "staff-recorded" : "ignored";
 }
 export const HUMAN_WAIT_MESSAGE = "Seu atendimento já foi encaminhado. Um atendente irá te atender em instantes. 🙂";
