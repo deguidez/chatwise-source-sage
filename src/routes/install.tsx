@@ -12,6 +12,8 @@ export const Route = createFileRoute("/install")({
   head: () => ({
     meta: [
       { title: "Instalação — Agente WhatsApp" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "description", content: "Configure o banco de dados do agente de IA para WhatsApp." },
       { property: "og:title", content: "Instalação — Agente WhatsApp" },
       { property: "og:description", content: "Configure o banco de dados do agente de IA para WhatsApp." },

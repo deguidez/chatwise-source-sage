@@ -43,3 +43,8 @@ Alternativa sem instalador: defina as variáveis `DB_HOST`, `DB_PORT`, `DB_NAME`
 2. Em Perfil, copie o **Token de acesso**.
 3. Em Configurações → Integrações → Webhooks, cole a URL do webhook do Chatwoot (mostrada no painel) e marque "Mensagem criada" e "Status da conversa alterado".
 4. Quando o atendente **resolver** a conversa, a IA volta a atender aquele cliente.
+
+## Lembrete sem resposta
+O atendimento automático pergunta uma vez se o cliente quer cancelar ou tem outra dúvida após 2 minutos sem resposta. Não envia lembretes durante atendimento humano. Ao responder `cancelar`, o cliente encerra; uma nova mensagem abre o menu novamente.
+
+Na VPS/hospedagem, configure `LOVABLE_CRON_SECRET` com um segredo forte e um agendador para enviar POST a `/api/public/jobs/inactivity` a cada minuto, com o cabeçalho `Authorization: Bearer <seu segredo>`. Não exponha o segredo no endereço. No Lovable, o agendamento é gerenciado. O envio ocorre entre 2 e 3 minutos em condições normais, conforme a próxima verificação; grandes filas podem levar mais tempo.

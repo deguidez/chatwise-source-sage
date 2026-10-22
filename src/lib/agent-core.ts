@@ -119,6 +119,28 @@ export function parseYCloudWebhook(body: any): IncomingMessage | null {
 
 export const TRANSFER_TOKEN = "[TRANSFERIR]";
 
+export const INACTIVITY_MS = 2 * 60 * 1000;
+export const INACTIVITY_QUESTION = "Você ainda está por aí? Quer cancelar o atendimento ou tem mais alguma dúvida? Para encerrar, responda cancelar.";
+
+export type InactivityState = {
+  stage: "menu" | "company" | "human";
+  closed?: boolean | undefined;
+  inactivityReminderAt?: string | undefined;
+  messages: { role: "user" | "assistant" | "agent"; at: string }[];
+};
+
+export function isInactivityDue(chat: InactivityState, time: number): boolean {
+  if (chat.stage === "human" || chat.closed || chat.inactivityReminderAt) return false;
+  const last = chat.messages.at(-1);
+  if (!last || last.role !== "assistant") return false;
+  const at = Date.parse(last.at);
+  return Number.isFinite(at) && time - at >= INACTIVITY_MS;
+}
+
+export function wantsToCancel(text: string): boolean {
+  return /^(cancelar|cancela|cancelar atendimento|cancelar o atendimento|encerrar|encerrar atendimento|encerrar o atendimento|quero cancelar|quero encerrar|sem mais duvidas|nao tenho mais duvidas)[.!?]*$/.test(norm(text).trim());
+}
+
 const HUMAN_RE = /\b(atendente|humano|pessoa|algu[eé]m de verdade|falar com (um|uma)?\s*(pessoa|atendente|algu[eé]m))\b/i;
 export const wantsHuman = (text: string) => HUMAN_RE.test(norm(text)) || HUMAN_RE.test(text);
 
@@ -151,7 +173,8 @@ export function routeMessage(
   }
   // Menu stage: pick a company by number or name
   const n = Number(t.match(/^\d+/)?.[0]);
-  if (n >= 1 && n <= companies.length) return { kind: "select", companyId: companies[n - 1]!.id };
+  const selected = companies[n - 1];
+  if (n >= 1 && n <= companies.length && selected) return { kind: "select", companyId: selected.id };
   if (humanOption && n === companies.length + 1) return { kind: "human" };
   const byName = companies.find((c) => t.includes(norm(c.name)));
   if (byName) return { kind: "select", companyId: byName.id };

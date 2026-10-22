@@ -39,7 +39,7 @@ export function ConversationsPanel() {
             {current && (
               <div className="flex items-center justify-between gap-2 border-b px-4 py-2 text-sm">
                 <span>
-                  {companyName(current.companyId)} · {current.stage === "human" ? "Com atendente" : "Com a IA"}
+                  {companyName(current.companyId)} · {current.closed ? "Encerrado" : current.stage === "human" ? "Com atendente" : current.inactivityReminderAt ? "Aguardando resposta" : "Com a IA"}
                 </span>
                 {current.stage === "human" && (
                   <Button size="sm" variant="outline" onClick={async () => {

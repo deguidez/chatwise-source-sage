@@ -11,6 +11,8 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Entrar — Agente WhatsApp" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "description", content: "Acesso ao painel do agente de IA para WhatsApp." },
       { property: "og:title", content: "Entrar — Agente WhatsApp" },
       { property: "og:description", content: "Acesso ao painel do agente de IA para WhatsApp." },
