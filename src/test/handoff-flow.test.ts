@@ -81,3 +81,15 @@ it("preserves Chatwoot handoff and resolution", async () => {
   expect(await handleChatwootEvent({ event: "conversation_resolved", id: 42 })).toBe("returned-to-ai");
   expect(state.conversations.chats[jid]?.stage).toBe("menu");
 });
+describe("transfer to another number", () => {
+  it("sends the customer a link to the attendant, a bold summary to the attendant, and ends the chat", async () => {
+    state.settings.handoffProvider = "other";
+    expect(await handleIncoming(incoming("quero um atendente", "1"), "evolution")).toBe("transferred-other");
+    const bodies = fetchMock.mock.calls.map((call) => JSON.parse(call[1].body));
+    expect(bodies.map((b) => b.number)).toEqual(["5511999990000", "5511888880000"]);
+    expect(bodies[0].text).toContain("https://wa.me/5511888880000");
+    expect(bodies[1].text).toContain("*Cliente:* quero um atendente");
+    expect(state.conversations.chats[jid]?.closed).toBe(true);
+    expect(await handleIncoming(incoming("oi", "2"), "evolution")).toBe("menu");
+  });
+});
