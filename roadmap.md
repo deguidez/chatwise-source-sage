@@ -1,6 +1,4 @@
 # Roadmap
-- [x] Transferência no mesmo WhatsApp com aviso ao atendente, mantendo Chatwoot opcional (testes simulados e opções no painel verificados; envio real depende de configurar o número e publicar)
-- [x] Instalador com MySQL e login admin
-- [x] IA gratuita (Gemini/Ollama), YCloud, duas empresas, transferência para Chatwoot
-- [x] Pergunta após 2 minutos sem resposta, cancelamento e agendamento automático (testes simulados aprovados; envio real depende de publicar e conectar WhatsApp)
-- [x] Central de atendimento no app: fila por empresa, atender, resolver, reabrir, pesquisa, anexos, áudio gravado, emojis e respostas rápidas (envio real de anexos depende da Evolution conectada)
+
+- [ ] Painel de gerenciamento de usuários: admin = super admin, só super admin configura chaves (em andamento)
+- [ ] Rodapé com copyright "Fotogrer 2026" no sistema
