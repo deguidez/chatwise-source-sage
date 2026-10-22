@@ -2,14 +2,31 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
+export type Company = { id: string; name: string; prompt: string };
+
 export type Settings = {
+  aiProvider: "openai" | "gemini" | "ollama";
   openaiKey: string;
   openaiModel: string;
+  geminiKey: string;
+  geminiModel: string;
+  ollamaUrl: string;
+  ollamaModel: string;
+  waProvider: "evolution" | "ycloud";
   evolutionUrl: string;
   evolutionKey: string;
   evolutionInstance: string;
+  ycloudKey: string;
+  ycloudFrom: string;
+  chatwootUrl: string;
+  chatwootAccountId: string;
+  chatwootToken: string;
+  chatwootInboxId: string;
   webhookToken: string;
   systemPrompt: string;
+  greeting: string;
+  humanOption: boolean;
+  companies: Company[];
   enabled: boolean;
   replyGroups: boolean;
 };
@@ -19,12 +36,23 @@ export type KnowledgeItem = {
   type: "text" | "pdf" | "url" | "file";
   title: string;
   content: string;
+  /** Company this content belongs to; empty = shared by all. */
+  companyId?: string;
   createdAt: string;
 };
 
-export type ChatMessage = { role: "user" | "assistant"; content: string; at: string };
+export type ChatMessage = { role: "user" | "assistant" | "agent"; content: string; at: string };
+export type ChatState = {
+  name: string;
+  number: string;
+  channel: "evolution" | "ycloud";
+  stage: "menu" | "company" | "human";
+  companyId?: string;
+  chatwootConversationId?: number;
+  messages: ChatMessage[];
+};
 export type Conversations = {
-  chats: Record<string, { name: string; messages: ChatMessage[] }>;
+  chats: Record<string, ChatState>;
   seenIds: string[];
 };
 
@@ -164,16 +192,34 @@ export function update<T>(name: string, fallback: T, fn: (d: T) => T | void) {
 }
 
 export const DEFAULT_PROMPT =
-  "Você é um atendente virtual simpático e objetivo no WhatsApp. Responda em português, com mensagens curtas. Use apenas as informações da base de conhecimento; se não souber, diga que vai encaminhar para um atendente humano.";
+  "Você é um atendente virtual simpático e objetivo no WhatsApp. Responda em português, com mensagens curtas. Use apenas as informações da base de conhecimento; se a resposta não estiver na base de conhecimento, responda apenas [TRANSFERIR].";
 
 const settingsFallback = (): Settings => ({
+  aiProvider: "gemini",
   openaiKey: "",
   openaiModel: "gpt-4o-mini",
+  geminiKey: "",
+  geminiModel: "gemini-2.5-flash",
+  ollamaUrl: "http://localhost:11434",
+  ollamaModel: "llama3.1",
+  waProvider: "evolution",
   evolutionUrl: "",
   evolutionKey: "",
   evolutionInstance: "",
+  ycloudKey: "",
+  ycloudFrom: "",
+  chatwootUrl: "",
+  chatwootAccountId: "",
+  chatwootToken: "",
+  chatwootInboxId: "",
   webhookToken: "",
   systemPrompt: DEFAULT_PROMPT,
+  greeting: "Oi! Tudo bem? Para que eu possa direcionar o seu atendimento rapidinho, me conta: sobre qual área você precisa falar?",
+  humanOption: true,
+  companies: [
+    { id: "pace3-associacao", name: "Associação Pace3", prompt: "" },
+    { id: "pace3-eventos", name: "Pace3 Eventos Esportivos", prompt: "" },
+  ],
   enabled: true,
   replyGroups: false,
 });
