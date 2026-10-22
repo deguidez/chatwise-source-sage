@@ -74,19 +74,19 @@ export function KnowledgePanel() {
         <p className="text-muted-foreground">Tudo que o agente pode usar para responder seus clientes.</p>
       </header>
 
-      <div className="space-y-4 rounded-2xl border bg-card p-6">
+      <div className="min-w-0 space-y-4 border-b pb-6">
         <div className="space-y-1.5">
           <span className="text-sm font-medium">Este conteúdo é de qual empresa?</span>
           <div className="flex flex-wrap gap-2">
             {[{ id: "", name: "Todas as empresas" }, ...companies].map((c) => (
-              <button key={c.id} onClick={() => setCompanyId(c.id)} className={`rounded-full border px-3 py-1 text-sm transition-colors ${companyId === c.id ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+              <Button variant="outline" key={c.id} aria-pressed={companyId === c.id} onClick={() => setCompanyId(c.id)} className={`h-auto min-h-11 max-w-full whitespace-normal break-words border px-3 py-2 text-sm transition-colors ${companyId === c.id ? "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted"}`}>
                 {c.name}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
         <Tabs defaultValue="text">
-          <TabsList>
+          <TabsList className="grid h-11 w-full grid-cols-3">
             <TabsTrigger value="text">Texto</TabsTrigger>
             <TabsTrigger value="file">PDF / arquivo</TabsTrigger>
             <TabsTrigger value="url">Site (URL)</TabsTrigger>
@@ -108,7 +108,7 @@ export function KnowledgePanel() {
           </TabsContent>
           <TabsContent value="file" className="mt-4">
             <label
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-10 text-center transition-colors hover:bg-muted"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-5 text-center transition-colors hover:bg-muted sm:p-10"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -121,7 +121,7 @@ export function KnowledgePanel() {
               <input ref={fileRef} type="file" multiple accept=".pdf,.txt,.md,.csv,.json" className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} />
             </label>
           </TabsContent>
-          <TabsContent value="url" className="mt-4 flex gap-2">
+          <TabsContent value="url" className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row">
             <Input placeholder="https://seusite.com.br/sobre" value={url} onChange={(e) => setUrl(e.target.value)} />
             <Button
               disabled={busy || !url}
@@ -136,9 +136,9 @@ export function KnowledgePanel() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <h2 className="text-lg font-semibold">{shown.length} conteúdo(s)</h2>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-md border bg-card px-3 py-1.5 text-sm">
+          <select aria-label="Filtrar conteúdo por empresa" value={filter} onChange={(e) => setFilter(e.target.value)} className="min-w-0 max-w-full rounded-md border bg-card px-3 py-1.5 text-sm">
             <option value="all">Mostrar todos</option>
             <option value="">Todas as empresas (compartilhado)</option>
             {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -147,21 +147,22 @@ export function KnowledgePanel() {
         {shown.map((i) => {
           const Icon = icons[i.type];
           return (
-            <div key={i.id} className="flex items-start gap-4 rounded-xl border bg-card p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+            <div key={i.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border bg-card p-3 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-4 sm:p-4">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground sm:flex">
                 <Icon className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{i.title}</div>
-                <p className="line-clamp-2 text-sm text-muted-foreground">{i.preview}</p>
+                <p className="line-clamp-2 break-words text-sm text-muted-foreground">{i.preview}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">{companyName(i.companyId)}</span>
+                  <span className="max-w-full break-words rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">{companyName(i.companyId)}</span>
                   <span>{i.size.toLocaleString("pt-BR")} caracteres</span>
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Excluir conteúdo"
                 onClick={() => run(() => deleteKnowledge({ data: { id: i.id } }), "Removido")}
               >
                 <Trash2 className="h-4 w-4" />

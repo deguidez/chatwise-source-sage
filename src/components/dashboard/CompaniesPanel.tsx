@@ -30,11 +30,11 @@ export function CompaniesPanel() {
 
       <Section title="Mensagem de boas-vindas">
         <Textarea rows={3} value={f.greeting} onChange={(e) => setF({ ...f, greeting: e.target.value })} />
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <Label>Mostrar opção "Falar com um atendente"</Label>
           <Switch checked={f.humanOption} onCheckedChange={(v) => setF({ ...f, humanOption: v })} />
         </div>
-        <div className="whitespace-pre-wrap rounded-xl bg-bubble-in p-4 text-sm shadow-sm ring-1 ring-border">{preview}</div>
+        <div className="whitespace-pre-wrap rounded-lg bg-bubble-in p-4 text-sm shadow-sm ring-1 ring-border [overflow-wrap:anywhere]">{preview}</div>
       </Section>
 
       {companies.map((c, i) => (
@@ -53,7 +53,7 @@ export function CompaniesPanel() {
         </Section>
       ))}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Button variant="outline" onClick={() => setCompanies([...companies, { id: crypto.randomUUID().slice(0, 8), name: "", prompt: "" }])}>
           <Plus className="mr-1 h-4 w-4" /> Adicionar empresa
         </Button>

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ShieldCheck, Trash2, UserPlus, Users, KeyRound, Pencil } from "lucide-react";
 import { listUsers, createUser, deleteUser, resetUserPassword, updateUser } from "@/lib/api.functions";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 type UserRow = { username: string; role: "super" | "attendant"; name?: string };
 
@@ -91,7 +93,7 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-xl border bg-card p-6">
+      <section className="min-w-0 border-b pb-6">
         <h2 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
           <Users className="h-5 w-5" /> Usuários do painel
         </h2>
@@ -100,8 +102,8 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
         </p>
         <ul className="divide-y">
           {users.map((u) => (
-            <li key={u.username} className="flex flex-wrap items-center gap-3 py-3">
-              <span className="font-medium">{displayName(u)}</span>
+            <li key={u.username} className="flex min-w-0 flex-wrap items-center gap-2 py-4">
+              <span className="max-w-full break-words font-medium">{displayName(u)}</span>
               {u.name && <span className="text-xs text-muted-foreground">({u.username})</span>}
               {u.username === currentUser && (
                 <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">você</span>
@@ -116,32 +118,30 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
                 {u.role === "super" && <ShieldCheck className="h-3 w-3" />}
                 {u.role === "super" ? "Super admin" : "Atendente"}
               </span>
-              <span className="ml-auto flex gap-2">
-                <button
+              <span className="flex w-full flex-wrap gap-2 pt-2 sm:ml-auto sm:w-auto sm:pt-0">
+                <Button variant="outline" size="sm"
                   onClick={() => {
                     setEditing(u);
                     setEditName(u.name ?? "");
                   }}
-                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-accent"
                 >
                   <Pencil className="h-3 w-3" /> Editar nome
-                </button>
-                <button
+                </Button>
+                <Button variant="outline" size="sm"
                   onClick={() => {
                     setResetFor(u.username);
                     setResetPassword("");
                   }}
-                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-accent"
                 >
                   <KeyRound className="h-3 w-3" /> Trocar senha
-                </button>
+                </Button>
                 {u.username !== currentUser && u.username !== "admin" && (
-                  <button
+                  <Button variant="outline" size="sm"
                     onClick={() => void remove(u.username)}
-                    className="flex items-center gap-1 rounded-lg border border-destructive px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                    className="border-destructive text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-3 w-3" /> Excluir
-                  </button>
+                  </Button>
                 )}
               </span>
             </li>
@@ -149,7 +149,7 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
         </ul>
       </section>
 
-      <section className="rounded-xl border bg-card p-6">
+      <section className="min-w-0">
         <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold">
           <UserPlus className="h-5 w-5" /> Novo usuário
         </h2>
@@ -193,19 +193,19 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
             </select>
           </label>
         </div>
-        <button
+        <Button
           onClick={() => void add()}
           disabled={busy || !username || !password}
-          className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          className="mt-4 w-full sm:w-auto"
         >
           Criar usuário
-        </button>
+        </Button>
       </section>
 
       {resetFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border bg-card p-6">
-            <h3 className="mb-3 font-display text-lg font-semibold">Nova senha para {resetFor}</h3>
+        <Dialog open onOpenChange={(open) => { if (!open) setResetFor(null); }}>
+          <DialogContent aria-describedby={undefined} className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-lg">
+            <DialogTitle className="pr-6 break-words">Nova senha para {resetFor}</DialogTitle>
             <input
               type="password"
               value={resetPassword}
@@ -214,25 +214,24 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
               className="w-full rounded-lg border bg-background px-3 py-2"
             />
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setResetFor(null)} className="rounded-lg border px-4 py-2 text-sm">
+              <Button variant="outline" onClick={() => setResetFor(null)}>
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void doReset()}
                 disabled={busy || resetPassword.length < 8}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 Salvar
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border bg-card p-6">
-            <h3 className="mb-1 font-display text-lg font-semibold">Editar nome</h3>
+        <Dialog open onOpenChange={(open) => { if (!open) setEditing(null); }}>
+          <DialogContent aria-describedby={undefined} className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-lg">
+            <DialogTitle>Editar nome</DialogTitle>
             <p className="mb-3 text-xs text-muted-foreground">
               Usuário: {editing.username} — o login continua o mesmo.
             </p>
@@ -243,19 +242,18 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
               className="w-full rounded-lg border bg-background px-3 py-2"
             />
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2 text-sm">
+              <Button variant="outline" onClick={() => setEditing(null)}>
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void saveName()}
                 disabled={busy}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 Salvar
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

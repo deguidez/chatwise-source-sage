@@ -13,6 +13,7 @@ vi.mock("@/lib/store.server", () => ({
   updateKnowledge: async (fn: (i: any[]) => any[]) => { state.knowledge = fn(state.knowledge ?? []); },
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async () => null,
+  recordMetric: async () => {},
 }));
 import { HUMAN_WAIT_MESSAGE, handleIncoming, handleChatwootEvent, returnToAI, sendInactivityReminders } from "@/lib/agent.server";
 

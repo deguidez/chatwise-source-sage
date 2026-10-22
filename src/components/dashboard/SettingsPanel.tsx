@@ -14,7 +14,7 @@ export type SettingsForm = Awaited<ReturnType<typeof loadSettings>>;
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-2xl border bg-card p-6">
+    <section className="min-w-0 space-y-4 border-b pb-6">
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -23,7 +23,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <Label>{label}</Label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -35,10 +35,10 @@ function Choice<T extends string>({ value, onChange, options }: { value: T; onCh
   return (
     <div className="grid gap-2 sm:grid-cols-3">
       {options.map((o) => (
-        <button key={o.id} type="button" onClick={() => onChange(o.id)} className={cn("rounded-xl border-2 p-3 text-left transition-colors", value === o.id ? "border-primary bg-secondary" : "hover:bg-muted")}>
+        <Button variant="ghost" key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className={cn("block h-auto min-w-0 whitespace-normal rounded-lg border-2 p-3 text-left transition-colors", value === o.id ? "border-primary bg-secondary" : "hover:bg-muted")}>
           <div className="text-sm font-semibold">{o.label}</div>
           <div className="text-xs text-muted-foreground">{o.desc}</div>
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -46,9 +46,9 @@ function Choice<T extends string>({ value, onChange, options }: { value: T; onCh
 
 function CopyField({ value }: { value: string }) {
   return (
-    <div className="flex gap-2">
-      <Input readOnly value={value} />
-      <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copiado"); }}>
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <Input readOnly value={value} className="min-w-0" />
+      <Button variant="outline" size="icon" aria-label="Copiar endereço" title="Copiar endereço" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copiado"); }}>
         <Copy className="h-4 w-4" />
       </Button>
     </div>
@@ -94,11 +94,11 @@ export function SettingsPanel() {
       </header>
 
       <Section title="Agente">
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <Label>Responder automaticamente</Label>
           <Switch checked={f.enabled} onCheckedChange={(v) => set("enabled", v)} />
         </div>
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <Label>Responder em grupos (só Evolution)</Label>
           <Switch checked={f.replyGroups} onCheckedChange={(v) => set("replyGroups", v)} />
         </div>
@@ -176,7 +176,7 @@ export function SettingsPanel() {
 
       <Section title="Atendimento humano">
         <Field label="Destino do atendimento">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:flex sm:flex-wrap">
             <Button variant={f.handoffProvider === "whatsapp" ? "default" : "outline"} aria-pressed={f.handoffProvider === "whatsapp"} onClick={() => set("handoffProvider", "whatsapp")}>Mesmo WhatsApp</Button>
             <Button variant={f.handoffProvider === "other" ? "default" : "outline"} aria-pressed={f.handoffProvider === "other"} onClick={() => set("handoffProvider", "other")}>Outro número</Button>
             <Button variant={f.handoffProvider === "chatwoot" ? "default" : "outline"} aria-pressed={f.handoffProvider === "chatwoot"} onClick={() => set("handoffProvider", "chatwoot")}>Chatwoot</Button>
@@ -206,7 +206,7 @@ export function SettingsPanel() {
         </Field>
       </Section>
 
-      <Button size="lg" onClick={save}>Salvar configurações</Button>
+      <Button size="lg" className="w-full sm:w-auto" onClick={save}>Salvar configurações</Button>
 
       <Section title="Alterar senha">
         <div className="grid gap-3 sm:grid-cols-2">

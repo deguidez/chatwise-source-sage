@@ -111,12 +111,47 @@
   }
 
   body {
+    margin: 0;
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-body);
   }
   h1, h2, h3 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
+  }
+}
+
+.attendance-shell {
+  height: calc(var(--app-height, 100dvh) - 6rem);
+}
+
+.dashboard-content :is(h1, h2, h3, p, label) {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1024px) {
+  .attendance-shell { height: calc(100dvh - 4rem); }
+}
+
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select {
+    min-height: 44px;
+  }
+  .dashboard-content h1 { font-size: 24px; line-height: 1.25; }
+}
+
+.chat-composer { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
