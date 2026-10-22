@@ -19,11 +19,21 @@ function clientIp() {
   return (getRequestHeader("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
 }
 
+function isHttps() {
+  if (process.env["COOKIE_SECURE"] === "true") return true;
+  const proto = (getRequestHeader("x-forwarded-proto") ?? "").split(",")[0]?.trim();
+  const origin = getRequestHeader("origin") ?? getRequestHeader("referer") ?? "";
+  return proto === "https" || origin.startsWith("https://");
+}
+
 function startSession(token: string) {
+  const https = isHttps();
+  // Over HTTPS use SameSite=None so login also works inside embedded previews (iframes).
   setCookie(COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env["COOKIE_SECURE"] === "true",
+    sameSite: https ? "none" : "lax",
+    secure: https,
+    partitioned: https,
     path: "/",
     maxAge: 60 * 60 * 24 * SESSION_DAYS,
   });
@@ -75,7 +85,8 @@ export async function login(username: string, password: string) {
 export async function logout() {
   const token = getCookie(COOKIE);
   if (token) await updateAuth((d) => void (d.sessions = d.sessions.filter((s) => s.token !== token)));
-  deleteCookie(COOKIE, { path: "/" });
+  const https = isHttps();
+  deleteCookie(COOKIE, { path: "/", sameSite: https ? "none" : "lax", secure: https, partitioned: https });
 }
 
 export async function changePassword(current: string, next: string) {
