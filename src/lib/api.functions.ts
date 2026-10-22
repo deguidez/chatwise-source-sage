@@ -68,10 +68,18 @@ export const createUser = createServerFn({ method: "POST" })
       username: z.string().min(3).max(30),
       password: z.string().min(8).max(200),
       role: z.enum(["super", "attendant"]),
+      name: z.string().max(60).optional(),
     }),
   )
   .handler(async ({ data }) => {
-    await (await auth()).createUser(data.username, data.password, data.role);
+    await (await auth()).createUser(data.username, data.password, data.role, data.name ?? "");
+    return { ok: true };
+  });
+
+export const updateUser = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30), name: z.string().max(60) }))
+  .handler(async ({ data }) => {
+    await (await auth()).updateUser(data.username, data.name);
     return { ok: true };
   });
 
@@ -263,9 +271,12 @@ export const deleteKnowledge = createServerFn({ method: "POST" })
 
 export const listConversations = createServerFn({ method: "GET" }).handler(async () => {
   await guard();
-  const c = await (await store()).getConversations();
+  const st = await store();
+  const c = await st.getConversations();
+  const users = (await st.getAuth()).users;
+  const nameOf = (u: string) => users.find((x) => x.username === u)?.name || u;
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", handledBy: chat.handledBy ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", handledBy: chat.handledBy ?? "", handledByName: chat.handledBy ? nameOf(chat.handledBy) : "", number: chat.number, channel: chat.channel, messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 

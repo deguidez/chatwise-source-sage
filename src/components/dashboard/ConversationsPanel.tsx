@@ -196,7 +196,7 @@ export function ConversationsPanel() {
                 <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                   {c.stage === "human" ? <Headset className="h-3 w-3 text-destructive" /> : <Bot className="h-3 w-3 text-primary" />}
                   {companyName(c.companyId)}
-                  {c.handledBy && <span className="ml-1 rounded-full bg-secondary px-1.5 py-0.5 text-secondary-foreground">👤 {c.handledBy}</span>}
+                  {c.handledBy && <span className="ml-1 rounded-full bg-secondary px-1.5 py-0.5 text-secondary-foreground">👤 {c.handledByName || c.handledBy}</span>}
                 </div>
               </div>
             </button>
@@ -221,7 +221,7 @@ export function ConversationsPanel() {
               </div>
               <div className="truncate text-xs text-muted-foreground">
                 +{current.number} · {companyName(current.companyId)} · {TABS.find((t) => t.id === currentTab)?.label}
-                {current.handledBy && <> · <span className="font-medium text-foreground">Atendido por {current.handledBy}</span></>}
+                {current.handledBy && <> · <span className="font-medium text-foreground">Atendido por {current.handledByName || current.handledBy}</span></>}
               </div>
             </div>
             {(currentTab === "queue" || currentTab === "ai") && <Button size="sm" onClick={() => run(() => assumeConversation({ data: { jid: current.jid } }), "Você assumiu o atendimento").then(() => setTab("open"))}><Headset className="mr-1 h-4 w-4" />Atender</Button>}

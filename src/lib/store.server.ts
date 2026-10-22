@@ -71,7 +71,7 @@ export type Conversations = {
 };
 
 export type UserRole = "super" | "attendant";
-export type AdminUser = { username: string; salt: string; hash: string; role?: UserRole | undefined };
+export type AdminUser = { username: string; salt: string; hash: string; role?: UserRole | undefined; name?: string | undefined };
 export type Session = { token: string; username: string; expires: number };
 export type AuthData = {
   users: AdminUser[];
