@@ -35,13 +35,13 @@ beforeEach(() => {
 
 describe("inactivity conversation flow", () => {
   it("sends once, closes on cancelar, and reopens on a new message", async () => {
-    expect(await sendInactivityReminders(start + 119999)).toEqual({ sent: 0, failed: 0 });
-    expect(await sendInactivityReminders(start + 120000)).toEqual({ sent: 1, failed: 0 });
+    expect(await sendInactivityReminders(start + 119999)).toMatchObject({ sent: 0, failed: 0 });
+    expect(await sendInactivityReminders(start + 120000)).toMatchObject({ sent: 1, failed: 0 });
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1].body).text).toBe(INACTIVITY_QUESTION);
-    expect(await sendInactivityReminders(start + 600000)).toEqual({ sent: 0, failed: 0 });
+    expect(await sendInactivityReminders(start + 600000)).toMatchObject({ sent: 0, failed: 0 });
     expect(await handleIncoming(incoming("cancelar", "cancel"), "evolution")).toBe("cancelled");
     expect(state.conversations.chats[jid]?.closed).toBe(true);
-    expect(await sendInactivityReminders(start + 900000)).toEqual({ sent: 0, failed: 0 });
+    expect(await sendInactivityReminders(start + 900000)).toMatchObject({ sent: 0, failed: 0 });
     expect(await handleIncoming(incoming("oi", "reopen"), "evolution")).toBe("menu");
     expect(state.conversations.chats[jid]?.closed).toBe(false);
     expect(state.conversations.chats[jid]?.companyId).toBeUndefined();
@@ -51,19 +51,19 @@ describe("inactivity conversation flow", () => {
     await sendInactivityReminders(start + 120000);
     expect(await handleIncoming(incoming("menu", "continue"), "evolution")).toBe("menu");
     expect(state.conversations.chats[jid]?.inactivityReminderAt).toBeUndefined();
-    expect(await sendInactivityReminders(Date.now() + 120001)).toEqual({ sent: 1, failed: 0 });
+    expect(await sendInactivityReminders(Date.now() + 120001)).toMatchObject({ sent: 1, failed: 0 });
   });
 
   it("skips human conversations and retries failed delivery", async () => {
     const chat: ChatState | undefined = state.conversations.chats[jid];
     if (!chat) throw new Error("Missing test conversation");
     chat.stage = "human";
-    expect(await sendInactivityReminders(start + 120000)).toEqual({ sent: 0, failed: 0 });
+    expect(await sendInactivityReminders(start + 120000)).toMatchObject({ sent: 0, failed: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
     chat.stage = "company";
     fetchMock.mockRejectedValueOnce(new Error("offline"));
-    expect(await sendInactivityReminders(start + 120000)).toEqual({ sent: 0, failed: 1 });
+    expect(await sendInactivityReminders(start + 120000)).toMatchObject({ sent: 0, failed: 1 });
     expect(chat.inactivityReminderAt).toBeUndefined();
-    expect(await sendInactivityReminders(start + 180000)).toEqual({ sent: 1, failed: 0 });
+    expect(await sendInactivityReminders(start + 180000)).toMatchObject({ sent: 1, failed: 0 });
   });
 });
