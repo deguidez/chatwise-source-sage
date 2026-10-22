@@ -57,7 +57,7 @@ function Dashboard() {
           <span className="font-display text-lg font-bold">Agente WhatsApp</span>
         </div>
         <nav className="flex gap-1 overflow-x-auto md:flex-col">
-          {tabs.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -84,11 +84,15 @@ function Dashboard() {
         <div className={cn("mx-auto", tab !== "chats" && "max-w-4xl")}>
           {tab === "companies" && <CompaniesPanel />}
           {tab === "knowledge" && <KnowledgePanel />}
-          {tab === "settings" && <SettingsPanel />}
+          {tab === "settings" && isSuper && <SettingsPanel />}
+          {tab === "users" && isSuper && <UsersPanel currentUser={auth.username} />}
           {tab === "test" && <TestPanel />}
           {tab === "chats" && <ConversationsPanel />}
           {tab === "quick" && <QuickRepliesPanel />}
         </div>
+        <footer className="mt-10 pb-2 text-center text-xs text-muted-foreground">
+          © 2026 Fotogrer — Todos os direitos reservados
+        </footer>
       </main>
     </div>
   );
