@@ -3,6 +3,7 @@ import {
   getConversations,
   getKnowledge,
   getSettings,
+  updateKnowledge,
   claimInactivityReminder,
   updateConversations,
   type ChatMessage,

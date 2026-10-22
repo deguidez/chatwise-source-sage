@@ -115,7 +115,7 @@ describe("attendant closes from the company phone", () => {
 it("aprende automaticamente com as respostas do atendente ao encerrar", async () => {
   state.knowledge = [];
   const { recordStaffMessage, closeByStaff } = await import("@/lib/agent.server");
-  await handleIncoming(incoming("qual o horário da retirada do kit?", "1"), "evolution");
+  state.conversations.chats[jid]!.messages.push({ role: "user", content: "qual o horário da retirada do kit?", at: new Date().toISOString() });
   await handleIncoming(incoming("atendente", "2"), "evolution");
   expect(await recordStaffMessage(jid, "A retirada é das 14h30 às 20h no Espetop.")).toBe("staff-recorded");
   await closeByStaff(jid);
