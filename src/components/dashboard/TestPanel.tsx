@@ -17,8 +17,8 @@ export function TestPanel() {
   const companies = settings?.companies ?? [];
   const [companyId, setCompanyId] = useState("");
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const message = input.trim();
     if (!message) return;
     setInput("");
