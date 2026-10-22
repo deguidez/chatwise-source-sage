@@ -1,70 +1,307 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Bot, Headset } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, CheckCircle2, FileText, Headset, Mic, Paperclip, Pencil, RotateCcw, Search, Send, Smile, Square, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { listConversations, loadSettings, returnChatToAI } from "@/lib/api.functions";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  assumeConversation,
+  listConversations,
+  listQuickReplies,
+  loadMedia,
+  loadSettings,
+  renameConversation,
+  reopenConversation,
+  resolveConversation,
+  returnChatToAI,
+  sendAgentMessage,
+} from "@/lib/api.functions";
+import { fillQuickReply, queueTab, type QueueTab } from "@/lib/agent-core";
 import { cn } from "@/lib/utils";
+
+type Chat = Awaited<ReturnType<typeof listConversations>>[number];
+type Media = NonNullable<Chat["messages"][number]["media"]>;
+
+const TABS: { id: QueueTab; label: string }[] = [
+  { id: "queue", label: "Fila" },
+  { id: "open", label: "Atendendo" },
+  { id: "ai", label: "Com a IA" },
+  { id: "resolved", label: "Finalizados" },
+];
+
+const EMOJIS = "😀 😁 😂 🤣 😊 😍 😘 😉 😎 🤩 🥳 😅 😇 🙂 🤔 😴 😢 😭 😡 🙏 👍 👎 👏 🙌 💪 👋 🤝 ✌️ 👌 ❤️ 💚 💙 💛 🔥 ⭐ ✨ 🎉 🏃 🏃‍♀️ 🚴 🏊 🏅 🏆 ⚽ 📅 📍 ⏰ ✅ ❌ ⚠️ 📞 💬 📷 🎥 📄 💰 🎁 🚀".split(" ");
+
+const fmtTime = (iso?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+};
+const displayName = (c: Chat) => c.name || `+${c.number || c.jid.split("@")[0]}`;
+const preview = (c: Chat) => {
+  const m = c.messages.at(-1);
+  if (!m) return "";
+  const media = m.media ? { image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 Arquivo", sticker: "Figurinha" }[m.media.kind] : "";
+  return [media, m.content].filter(Boolean).join(" ");
+};
+
+function fileToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+const kindOf = (mime: string): Media["kind"] =>
+  mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "document";
+
+function MediaView({ media }: { media: Media }) {
+  const { data, isError } = useQuery({ queryKey: ["media", media.id], queryFn: () => loadMedia({ data: { id: media.id } }), staleTime: Infinity });
+  if (isError) return <p className="text-xs text-destructive">Arquivo indisponível</p>;
+  if (!data) return <div className="h-24 w-40 animate-pulse rounded-lg bg-muted" />;
+  const src = `data:${data.mimetype};base64,${data.data}`;
+  if (media.kind === "image" || media.kind === "sticker") return <a href={src} target="_blank" rel="noreferrer"><img src={src} alt="Foto" className="max-h-72 max-w-full rounded-lg" /></a>;
+  if (media.kind === "video") return <video src={src} controls className="max-h-72 max-w-full rounded-lg" />;
+  if (media.kind === "audio") return <audio src={src} controls className="max-w-full" />;
+  return (
+    <a href={src} download={media.fileName || "arquivo"} className="flex items-center gap-2 rounded-lg bg-background/60 p-2 text-sm underline">
+      <FileText className="h-5 w-5" /> {media.fileName || "Baixar arquivo"}
+    </a>
+  );
+}
 
 export function ConversationsPanel() {
   const qc = useQueryClient();
-  const { data: chats = [] } = useQuery({ queryKey: ["chats"], queryFn: () => listConversations(), refetchInterval: 10000 });
+  const { data: chats = [] } = useQuery({ queryKey: ["chats"], queryFn: () => listConversations(), refetchInterval: 4000 });
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
+  const { data: quick = [] } = useQuery({ queryKey: ["quick-replies"], queryFn: () => listQuickReplies() });
+  const [tab, setTab] = useState<QueueTab>("queue");
+  const [company, setCompany] = useState("all");
+  const [search, setSearch] = useState("");
   const [sel, setSel] = useState<string | null>(null);
-  const current = chats.find((c) => c.jid === sel) ?? chats[0];
-  const companyName = (id: string) => settings?.companies.find((c) => c.id === id)?.name ?? "No menu";
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const companyName = (id: string) => settings?.companies.find((c) => c.id === id)?.name ?? "Sem empresa";
+  const counts = useMemo(() => {
+    const r: Record<QueueTab, number> = { ai: 0, queue: 0, open: 0, resolved: 0 };
+    chats.forEach((c) => { if (company === "all" || c.companyId === company) r[queueTab(c)]++; });
+    return r;
+  }, [chats, company]);
+  const filtered = chats.filter((c) => {
+    if (company !== "all" && c.companyId !== company) return false;
+    const q = search.trim().toLowerCase();
+    if (q) return displayName(c).toLowerCase().includes(q) || c.number.includes(q.replace(/\D/g, "") || "§") || c.messages.some((m) => m.content.toLowerCase().includes(q));
+    return queueTab(c) === tab;
+  });
+  const current = chats.find((c) => c.jid === sel);
+  const currentTab = current ? queueTab(current) : null;
+
+  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [current?.jid, current?.messages.length]);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["chats"] });
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    try { await fn(); toast.success(ok); refresh(); } catch (e) { toast.error(e instanceof Error ? e.message : "Algo deu errado"); }
+  };
+
+  const send = async (override?: { blob: Blob; mimetype: string; kind: Media["kind"]; fileName?: string }) => {
+    if (!current) return;
+    const att = override ?? (file ? { blob: file, mimetype: file.type || "application/octet-stream", kind: kindOf(file.type), fileName: file.name } : null);
+    if (!att && !text.trim()) return;
+    if (att && att.blob.size > 16 * 1024 * 1024) return toast.error("Arquivo maior que 16 MB");
+    setSending(true);
+    try {
+      const media = att ? { kind: att.kind, mimetype: att.mimetype, fileName: att.fileName, data: await fileToBase64(att.blob) } : undefined;
+      await sendAgentMessage({ data: { jid: current.jid, text: override ? "" : text.trim(), media } });
+      if (!override) { setText(""); setFile(null); }
+      if (currentTab !== "open") setTab("open");
+      refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível enviar");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const toggleRecord = async () => {
+    if (recording) { recorder.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const type = ["audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/webm"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+      const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const parts: Blob[] = [];
+      rec.ondataavailable = (e) => parts.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const mimetype = (rec.mimeType || "audio/webm").split(";")[0] ?? "audio/webm";
+        const blob = new Blob(parts, { type: mimetype });
+        if (blob.size > 0) void send({ blob, mimetype, kind: "audio" });
+      };
+      rec.start();
+      recorder.current = rec;
+      setRecording(true);
+    } catch {
+      toast.error("Permita o uso do microfone para gravar áudio");
+    }
+  };
+
+  const slash = text.startsWith("/") ? text.slice(1).toLowerCase() : null;
+  const suggestions = slash !== null ? quick.filter((q) => q.shortcut.includes(slash) || q.text.toLowerCase().includes(slash)).slice(0, 6) : [];
+  const useQuick = (t: string) => setText(fillQuickReply(t, current?.name ?? ""));
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold">Conversas</h1>
-        <p className="text-muted-foreground">Atendimentos da IA, WhatsApp e Chatwoot.</p>
-      </header>
-      {chats.length === 0 ? (
-        <p className="rounded-2xl border bg-card p-10 text-center text-muted-foreground">Nenhuma conversa ainda.</p>
-      ) : (
-        <div className="grid h-[65vh] overflow-hidden rounded-2xl border bg-card md:grid-cols-[260px_1fr]">
-          <div className="overflow-y-auto border-r">
-            {chats.map((c) => (
-              <button key={c.jid} onClick={() => setSel(c.jid)} className={cn("block w-full border-b px-4 py-3 text-left hover:bg-muted", current?.jid === c.jid && "bg-secondary")}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium">{c.name || c.jid.split("@")[0]}</span>
-                  {c.stage === "human" ? <Headset className="h-4 w-4 shrink-0 text-destructive" /> : <Bot className="h-4 w-4 shrink-0 text-primary" />}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">{companyName(c.companyId)}</div>
-              </button>
-            ))}
+    <div className="flex h-[calc(100vh-5rem)] min-h-[520px] overflow-hidden rounded-2xl border bg-card">
+      {/* Lista */}
+      <div className={cn("flex w-full flex-col border-r md:w-80", current && "hidden md:flex")}>
+        <div className="space-y-2 border-b p-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar nome, número ou mensagem" className="pl-8" />
           </div>
-          <div className="flex min-h-0 flex-col">
-            {current && (
-              <div className="flex items-center justify-between gap-2 border-b px-4 py-2 text-sm">
-                <span>
-                  {companyName(current.companyId)} · {current.closed ? "Encerrado" : current.stage === "human" ? `Com atendente · ${current.handoffProvider === "whatsapp" ? "WhatsApp" : "Chatwoot"}` : current.inactivityReminderAt ? "Aguardando resposta" : "Com a IA"}
-                </span>
-                {current.stage === "human" && (
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    try {
-                      await returnChatToAI({ data: { jid: current.jid } });
-                      toast.success("Conversa devolvida para a IA");
-                      qc.invalidateQueries({ queryKey: ["chats"] });
-                    } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Não foi possível devolver a conversa");
-                    }
-                  }}>
-                    Devolver para a IA
-                  </Button>
-                )}
+          <select value={company} onChange={(e) => setCompany(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm" aria-label="Filtrar por empresa">
+            <option value="all">Todas as empresas</option>
+            {settings?.companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {!search && (
+            <div className="grid grid-cols-4 gap-1">
+              {TABS.map((t) => (
+                <button key={t.id} onClick={() => setTab(t.id)} className={cn("rounded-md px-1 py-1.5 text-xs font-medium", tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-secondary")}>
+                  {t.label}
+                  <span className="block text-[10px] opacity-80">{counts[t.id]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma conversa aqui.</p>}
+          {filtered.map((c) => (
+            <button key={c.jid} onClick={() => setSel(c.jid)} className={cn("flex w-full gap-3 border-b px-3 py-3 text-left hover:bg-muted", sel === c.jid && "bg-secondary")}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary">{displayName(c).replace("+", "").slice(0, 1).toUpperCase()}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">{displayName(c)}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{fmtTime(c.messages.at(-1)?.at)}</span>
+                </div>
+                <div className="truncate text-xs text-muted-foreground">{preview(c)}</div>
+                <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                  {c.stage === "human" ? <Headset className="h-3 w-3 text-destructive" /> : <Bot className="h-3 w-3 text-primary" />}
+                  {companyName(c.companyId)}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Conversa */}
+      {!current ? (
+        <div className="hidden flex-1 items-center justify-center text-muted-foreground md:flex">Escolha uma conversa</div>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+            <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setSel(null)} aria-label="Voltar"><X className="h-4 w-4" /></Button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1 font-semibold">
+                <span className="truncate">{displayName(current)}</span>
+                <button aria-label="Editar nome" className="text-muted-foreground hover:text-foreground" onClick={() => {
+                  const name = window.prompt("Nome do cliente", current.name);
+                  if (name?.trim()) void run(() => renameConversation({ data: { jid: current.jid, name: name.trim() } }), "Nome atualizado");
+                }}><Pencil className="h-3.5 w-3.5" /></button>
+              </div>
+              <div className="truncate text-xs text-muted-foreground">+{current.number} · {companyName(current.companyId)} · {TABS.find((t) => t.id === currentTab)?.label}</div>
+            </div>
+            {(currentTab === "queue" || currentTab === "ai") && <Button size="sm" onClick={() => run(() => assumeConversation({ data: { jid: current.jid } }), "Você assumiu o atendimento").then(() => setTab("open"))}><Headset className="mr-1 h-4 w-4" />Atender</Button>}
+            {(currentTab === "queue" || currentTab === "open") && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => run(() => returnChatToAI({ data: { jid: current.jid } }), "Conversa devolvida para a IA")}><Bot className="mr-1 h-4 w-4" />IA</Button>
+                <Button size="sm" variant="secondary" onClick={() => run(() => resolveConversation({ data: { jid: current.jid, notify: true } }), "Conversa finalizada").then(() => setTab("resolved"))}><CheckCircle2 className="mr-1 h-4 w-4" />Resolver</Button>
+              </>
+            )}
+            {currentTab === "resolved" && <Button size="sm" onClick={() => run(() => reopenConversation({ data: { jid: current.jid } }), "Conversa reaberta").then(() => setTab("open"))}><RotateCcw className="mr-1 h-4 w-4" />Reabrir</Button>}
+          </div>
+          {current.handoffNotificationError && <p role="alert" className="border-b bg-destructive/10 p-2 text-sm text-destructive">Falha no aviso ao atendente: {current.handoffNotificationError}</p>}
+
+          <div className="flex-1 space-y-2 overflow-y-auto bg-muted p-4">
+            {current.messages.map((m, i) => (
+              <div key={i} className={cn("max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-sm shadow-sm", m.role === "user" ? "bg-bubble-in" : "ml-auto bg-bubble-out", m.role === "agent" && "ring-2 ring-accent")}>
+                <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{m.role === "agent" ? "Atendente" : m.role === "assistant" ? "IA" : displayName(current)}</div>
+                {m.media && <div className="mb-1"><MediaView media={m.media} /></div>}
+                {m.content}
+                <div className="mt-1 text-right text-[10px] text-muted-foreground">{new Date(m.at).toLocaleString("pt-BR")}</div>
+              </div>
+            ))}
+            <div ref={bottom} />
+          </div>
+
+          {/* Composer */}
+          <div className="relative border-t p-2">
+            {suggestions.length > 0 && (
+              <div className="absolute bottom-full left-2 right-2 mb-1 max-h-60 overflow-y-auto rounded-lg border bg-popover shadow-lg">
+                {suggestions.map((q) => (
+                  <button key={q.id} onClick={() => useQuick(q.text)} className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-muted">
+                    <span className="font-semibold">/{q.shortcut}</span> <span className="text-muted-foreground">{q.text.slice(0, 80)}</span>
+                  </button>
+                ))}
               </div>
             )}
-            {current?.handoffNotificationError && <p role="alert" className="border-b bg-destructive/10 p-3 text-sm text-destructive">Falha no aviso ao atendente: {current.handoffNotificationError}</p>}
-            <div className="flex-1 space-y-2 overflow-y-auto bg-muted p-4">
-              {current?.messages.map((m, i) => (
-                <div key={i} className={cn("max-w-[80%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm shadow-sm", m.role === "user" ? "bg-bubble-in" : "ml-auto bg-bubble-out", m.role === "agent" && "ring-2 ring-accent")}>
-                  {m.role === "agent" && <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">Atendente</div>}
-                  {m.content}
-                  <div className="mt-1 text-right text-[10px] text-muted-foreground">{new Date(m.at).toLocaleString("pt-BR")}</div>
-                </div>
-              ))}
+            {file && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-sm">
+                <Paperclip className="h-4 w-4" /> <span className="flex-1 truncate">{file.name}</span>
+                <button aria-label="Remover anexo" onClick={() => setFile(null)}><X className="h-4 w-4" /></button>
+              </div>
+            )}
+            <div className="flex items-end gap-1">
+              <Popover>
+                <PopoverTrigger asChild><Button size="icon" variant="ghost" aria-label="Emojis"><Smile className="h-5 w-5" /></Button></PopoverTrigger>
+                <PopoverContent className="grid w-72 grid-cols-8 gap-1 p-2">
+                  {EMOJIS.map((e) => <button key={e} className="rounded p-1 text-xl hover:bg-muted" onClick={() => setText((t) => t + e)}>{e}</button>)}
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild><Button size="icon" variant="ghost" aria-label="Respostas rápidas"><Zap className="h-5 w-5" /></Button></PopoverTrigger>
+                <PopoverContent className="max-h-72 w-80 overflow-y-auto p-1">
+                  {quick.length === 0 && <p className="p-3 text-sm text-muted-foreground">Cadastre respostas rápidas na aba "Respostas rápidas".</p>}
+                  {quick.map((q) => (
+                    <button key={q.id} onClick={() => useQuick(q.text)} className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted">
+                      <span className="font-semibold">/{q.shortcut}</span>
+                      <span className="block truncate text-muted-foreground">{q.text}</span>
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+              <Button size="icon" variant="ghost" aria-label="Anexar arquivo" onClick={() => fileInput.current?.click()}><Paperclip className="h-5 w-5" /></Button>
+              <input ref={fileInput} type="file" className="hidden" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={(e) => { setFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (suggestions[0] && slash !== null) useQuick(suggestions[0].text);
+                    else void send();
+                  }
+                }}
+                rows={1}
+                placeholder={recording ? "Gravando áudio…" : "Digite uma mensagem ou / para respostas rápidas"}
+                className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm"
+              />
+              {text.trim() || file ? (
+                <Button size="icon" onClick={() => send()} disabled={sending} aria-label="Enviar"><Send className="h-4 w-4" /></Button>
+              ) : (
+                <Button size="icon" variant={recording ? "destructive" : "default"} onClick={toggleRecord} disabled={sending} aria-label={recording ? "Parar e enviar áudio" : "Gravar áudio"}>
+                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </div>
         </div>
