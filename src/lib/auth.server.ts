@@ -19,11 +19,21 @@ function clientIp() {
   return (getRequestHeader("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
 }
 
+function isHttps() {
+  if (process.env["COOKIE_SECURE"] === "true") return true;
+  const proto = (getRequestHeader("x-forwarded-proto") ?? "").split(",")[0]?.trim();
+  const origin = getRequestHeader("origin") ?? getRequestHeader("referer") ?? "";
+  return proto === "https" || origin.startsWith("https://");
+}
+
 function startSession(token: string) {
+  const https = isHttps();
+  // Over HTTPS use SameSite=None so login also works inside embedded previews (iframes).
   setCookie(COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env["COOKIE_SECURE"] === "true",
+    sameSite: https ? "none" : "lax",
+    secure: https,
+    partitioned: https,
     path: "/",
     maxAge: 60 * 60 * 24 * SESSION_DAYS,
   });
