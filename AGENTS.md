@@ -10,8 +10,8 @@
 <!-- LOVABLE:END -->
 
 ## Architecture
-- Self-hosted on a Node VPS (build with NITRO_PRESET=node-server); no Lovable Cloud — user wants everything on their VPS.
-- Persistence is JSON files in DATA_DIR via src/lib/store.server.ts (single admin, low volume); keep all fs access there.
-- Single-admin auth: scrypt password + session tokens in auth.json, httpOnly cookie; every server fn calls requireAdmin.
+- Self-hosted on shared hosting/VPS with Node (npm run build:hosting, startup file app.cjs); no Lovable Cloud — user hosts everything.
+- Persistence goes through src/lib/store.server.ts as JSON documents, driver MySQL (app_data table, auto-created) or files, chosen in the /install wizard or DB_* env; keep all storage access there.
+- Auth: username+scrypt hash in auth doc (default admin seeded as hash only), expiring sessions, per IP+user lockout; every server fn calls requireAdmin.
 - WhatsApp via Evolution API webhook at /api/public/evolution/webhook?token=… (token checked); AI via user's own OpenAI key from settings.
 - Pure parsing/retrieval logic lives in src/lib/agent-core.ts so it stays unit-testable.

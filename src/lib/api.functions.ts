@@ -11,17 +11,38 @@ export const getAuthState = createServerFn({ method: "GET" }).handler(async () =
   (await auth()).authState(),
 );
 
-export const setupPassword = createServerFn({ method: "POST" })
-  .validator(z.object({ password: z.string().min(8).max(200) }))
+export const login = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
-    await (await auth()).setupPassword(data.password);
+    await (await auth()).login(data.username, data.password);
     return { ok: true };
   });
 
-export const login = createServerFn({ method: "POST" })
-  .validator(z.object({ password: z.string().min(1).max(200) }))
+export const installApp = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      driver: z.enum(["mysql", "file"]),
+      host: z.string().max(255).optional(),
+      port: z.number().int().min(1).max(65535).optional(),
+      database: z.string().max(100).optional(),
+      user: z.string().max(100).optional(),
+      password: z.string().max(255).optional(),
+    }),
+  )
   .handler(async ({ data }) => {
-    await (await auth()).login(data.password);
+    const st = await store();
+    if (await st.getDbConfig()) throw new Error("O sistema já está instalado");
+    if (data.driver === "mysql") {
+      if (!data.host || !data.database || !data.user) throw new Error("Preencha servidor, banco e usuário");
+      try {
+        await st.installMysql(data);
+      } catch (e) {
+        throw new Error(`Não foi possível conectar ao MySQL: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    await st.saveDbConfig(data);
+    await st.getSettings(); // creates default settings
+    await st.updateAuth(() => {}); // creates default admin
     return { ok: true };
   });
 
