@@ -141,7 +141,7 @@ async function openChatwootConversation(s: Settings, chat: ChatState, companyNam
   });
   const transcript = chat.messages
     .slice(-20)
-    .map((m) => `${m.role === "user" ? "Cliente" : "IA"}: ${m.content}`)
+    .map((m) => `${m.role === "user" ? "**Cliente:**" : "**IA:**"} ${m.content}`)
     .join("\n");
   await cw(s, "POST", `/conversations/${conv.id}/messages`, {
     content: `Transferido pela IA — ${companyName}\n\n${transcript}`,
@@ -173,7 +173,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   const s = await getSettings();
   if (!s.enabled) return "disabled";
   if (msg.isGroup && !s.replyGroups) return "group-ignored";
-  if (s.handoffProvider === "whatsapp" && msg.number === s.attendantNumber) return "staff-ignored";
+  if (s.handoffProvider !== "chatwoot" && msg.number === s.attendantNumber) return "staff-ignored";
 
   const convs = await getConversations();
   if (msg.id && convs.seenIds.includes(msg.id)) return "duplicate";
@@ -234,7 +234,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       }, base);
       try {
         if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para os avisos ao atendente");
-        const transcript = [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "Cliente" : "IA"}: ${m.content}`).join("\n").slice(-3000);
+        const transcript = [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "**Cliente:**" : "**IA:**"} ${m.content}`).join("\n").slice(-3000);
         await sendWhatsApp(s, channel, s.attendantNumber, `Atendimento humano solicitado — ${companyName}\nCliente: ${chat.name || msg.number}\nWhatsApp: +${msg.number}\n\n${transcript}`);
         return "transferred-whatsapp";
       } catch (error) {

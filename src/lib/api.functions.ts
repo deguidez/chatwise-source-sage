@@ -83,7 +83,7 @@ const settingsSchema = z.object({
   waProvider: z.enum(["evolution", "ycloud"]).optional(),
   ycloudKey: str(),
   ycloudFrom: str(50),
-  handoffProvider: z.enum(["whatsapp", "chatwoot"]).optional(),
+  handoffProvider: z.enum(["whatsapp", "other", "chatwoot"]).optional(),
   attendantNumber: z.string().max(30).transform((v) => v.replace(/\D/g, "")).refine((v) => !v || /^[1-9]\d{7,14}$/.test(v), "Informe o WhatsApp do atendente com DDI").optional(),
   chatwootUrl: str(),
   chatwootAccountId: str(20),
@@ -110,7 +110,7 @@ export const saveSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await guard();
     await (await store()).updateSettings((s) => {
-      if ((data.handoffProvider ?? s.handoffProvider) === "whatsapp" && !(data.attendantNumber ?? s.attendantNumber)) {
+      if ((data.handoffProvider ?? s.handoffProvider) !== "chatwoot" && !(data.attendantNumber ?? s.attendantNumber)) {
         throw new Error("Informe o WhatsApp do atendente para receber os avisos");
       }
       for (const [k, v] of Object.entries(data)) {

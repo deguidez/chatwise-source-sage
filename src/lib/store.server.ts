@@ -19,7 +19,7 @@ export type Settings = {
   evolutionInstance: string;
   ycloudKey: string;
   ycloudFrom: string;
-  handoffProvider: "whatsapp" | "chatwoot";
+  handoffProvider: "whatsapp" | "other" | "chatwoot";
   attendantNumber: string;
   chatwootUrl: string;
   chatwootAccountId: string;
@@ -52,7 +52,7 @@ export type ChatState = {
   stage: "menu" | "company" | "human";
   companyId?: string | undefined;
   chatwootConversationId?: number | undefined;
-  handoffProvider?: "whatsapp" | "chatwoot" | undefined;
+  handoffProvider?: "whatsapp" | "other" | "chatwoot" | undefined;
   handoffNotificationError?: string | undefined;
   inactivityReminderAt?: string | undefined;
   closed?: boolean | undefined;
