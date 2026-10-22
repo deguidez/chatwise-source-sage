@@ -68,10 +68,18 @@ export const createUser = createServerFn({ method: "POST" })
       username: z.string().min(3).max(30),
       password: z.string().min(8).max(200),
       role: z.enum(["super", "attendant"]),
+      name: z.string().max(60).optional(),
     }),
   )
   .handler(async ({ data }) => {
-    await (await auth()).createUser(data.username, data.password, data.role);
+    await (await auth()).createUser(data.username, data.password, data.role, data.name ?? "");
+    return { ok: true };
+  });
+
+export const updateUser = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30), name: z.string().max(60) }))
+  .handler(async ({ data }) => {
+    await (await auth()).updateUser(data.username, data.name);
     return { ok: true };
   });
 
