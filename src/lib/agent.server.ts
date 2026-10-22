@@ -173,6 +173,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   const s = await getSettings();
   if (!s.enabled) return "disabled";
   if (msg.isGroup && !s.replyGroups) return "group-ignored";
+  if (s.handoffProvider === "whatsapp" && msg.number === s.attendantNumber) return "staff-ignored";
 
   const convs = await getConversations();
   if (msg.id && convs.seenIds.includes(msg.id)) return "duplicate";
@@ -214,22 +215,44 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }, base);
 
   if (route.kind === "silent") {
-    if (chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
+    if (chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
     await saveChat(msg.jid, (c) => c.messages.push(userMsg), base);
     return "forwarded";
   }
 
   const transfer = async (): Promise<string> => {
     const companyName = s.companies.find((c) => c.id === chat.companyId)?.name ?? "Sem empresa";
+    if (s.handoffProvider === "whatsapp") {
+      const out = await reply("Certo! Um atendente vai continuar seu atendimento aqui neste WhatsApp. Aguarde um instante. 🙂");
+      // Pause durably before notifying staff, even if notification delivery fails.
+      await saveChat(msg.jid, (c) => {
+        c.messages.push(userMsg, out);
+        c.stage = "human";
+        c.handoffProvider = "whatsapp";
+        c.chatwootConversationId = undefined;
+        c.handoffNotificationError = undefined;
+      }, base);
+      try {
+        if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para os avisos ao atendente");
+        const transcript = [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "Cliente" : "IA"}: ${m.content}`).join("\n").slice(-3000);
+        await sendWhatsApp(s, channel, s.attendantNumber, `Atendimento humano solicitado — ${companyName}\nCliente: ${chat.name || msg.number}\nWhatsApp: +${msg.number}\n\n${transcript}`);
+        return "transferred-whatsapp";
+      } catch (error) {
+        await saveChat(msg.jid, (c) => {
+          c.handoffNotificationError = error instanceof Error ? error.message : "Falha ao avisar atendente";
+        }, base);
+        return "human-notification-failed";
+      }
+    }
     if (!chatwootReady(s)) {
       const out = await reply("Vou te encaminhar para um atendente. Em breve alguém vai falar com você.");
-      await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; }, base);
+      await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.handoffProvider = "chatwoot"; }, base);
       return "human-no-chatwoot";
     }
     const out = await reply("Certo! Vou transferir você para um dos nossos atendentes. Aguarde só um instante. 🙂");
     const tmp = { ...chat, messages: [...chat.messages, userMsg, out] };
     const conversationId = await openChatwootConversation(s, tmp, companyName);
-    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.chatwootConversationId = conversationId; }, base);
+    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.handoffProvider = "chatwoot"; c.chatwootConversationId = conversationId; }, base);
     return "transferred";
   };
 
@@ -300,6 +323,7 @@ export async function handleChatwootEvent(body: any) {
   const entry = Object.entries(convs.chats).find(([, c]) => c.chatwootConversationId === conversationId);
   if (!entry) return "unknown-conversation";
   const [jid, chat] = entry;
+  if (chat.stage !== "human" || chat.handoffProvider === "whatsapp") return "ignored";
 
   if (body.event === "message_created") {
     if (body.message_type !== "outgoing" || body.private || !body.content) return "ignored";
@@ -319,6 +343,8 @@ export async function handleChatwootEvent(body: any) {
       ch.stage = "menu";
       ch.companyId = undefined;
       ch.chatwootConversationId = undefined;
+      ch.handoffProvider = undefined;
+      ch.handoffNotificationError = undefined;
     });
     return "returned-to-ai";
   }
@@ -333,5 +359,7 @@ export async function returnToAI(jid: string) {
     ch.stage = "menu";
     ch.companyId = undefined;
     ch.chatwootConversationId = undefined;
+    ch.handoffProvider = undefined;
+    ch.handoffNotificationError = undefined;
   });
 }

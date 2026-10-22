@@ -27,7 +27,7 @@ export function TestPanel() {
     setBusy(true);
     try {
       const { reply: raw } = await testAgent({ data: { message, history, companyId: companyId || companies[0]?.id || "" } });
-      const reply = raw.includes("[TRANSFERIR]") ? "➡️ Aqui a conversa seria transferida para um atendente no Chatwoot." : raw;
+      const reply = raw.includes("[TRANSFERIR]") ? `➡️ Aqui a conversa seria transferida para um atendente ${settings?.handoffProvider === "whatsapp" ? "no mesmo WhatsApp" : "no Chatwoot"}.` : raw;
       setMsgs((m) => [...m, { role: "assistant", content: reply }]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro");

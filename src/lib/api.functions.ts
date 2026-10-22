@@ -83,6 +83,8 @@ const settingsSchema = z.object({
   waProvider: z.enum(["evolution", "ycloud"]).optional(),
   ycloudKey: str(),
   ycloudFrom: str(50),
+  handoffProvider: z.enum(["whatsapp", "chatwoot"]).optional(),
+  attendantNumber: z.string().max(30).transform((v) => v.replace(/\D/g, "")).refine((v) => !v || /^[1-9]\d{7,14}$/.test(v), "Informe o WhatsApp do atendente com DDI").optional(),
   chatwootUrl: str(),
   chatwootAccountId: str(20),
   chatwootToken: str(),
@@ -108,6 +110,9 @@ export const saveSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await guard();
     await (await store()).updateSettings((s) => {
+      if ((data.handoffProvider ?? s.handoffProvider) === "whatsapp" && !(data.attendantNumber ?? s.attendantNumber)) {
+        throw new Error("Informe o WhatsApp do atendente para receber os avisos");
+      }
       for (const [k, v] of Object.entries(data)) {
         if (v === undefined) continue;
         // Masked/empty secret fields mean "keep current value"
@@ -192,7 +197,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
