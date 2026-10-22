@@ -122,7 +122,7 @@ export function SettingsPanel() {
             <Field label="Chave do Gemini" hint="Gere grátis em aistudio.google.com/apikey">
               <Input type="password" value={f.geminiKey} onChange={(e) => set("geminiKey", e.target.value)} />
             </Field>
-            <Field label="Modelo" hint="Ex: gemini-2.5-flash, gemini-2.5-flash-lite">
+            <Field label="Modelo" hint="Ex: gemini-3.8-flash, gemini-3.8-flash">
               <Input value={f.geminiModel} onChange={(e) => set("geminiModel", e.target.value)} />
             </Field>
           </>
