@@ -481,7 +481,6 @@ export async function closeByStaff(jid: string) {
     chat.closed = true;
     chat.ticketStatus = "resolved";
     chat.closedAt = now();
-    chat.companyId = undefined;
     chat.handoffProvider = undefined;
     chat.handoffNotificationError = undefined;
     chat.inactivityReminderAt = undefined;
@@ -541,6 +540,7 @@ export async function returnToAI(jid: string) {
     if (ch.stage === "human") snapshot = structuredClone(ch);
     ch.stage = "menu";
     ch.companyId = undefined;
+    ch.ticketStatus = undefined;
     ch.chatwootConversationId = undefined;
     ch.handoffProvider = undefined;
     ch.handoffNotificationError = undefined;
@@ -602,7 +602,6 @@ export async function resolveChat(jid: string, notify = true) {
     ch.closed = true;
     ch.ticketStatus = "resolved";
     ch.closedAt = now();
-    ch.companyId = ch.companyId;
     ch.handoffProvider = undefined;
     ch.chatwootConversationId = undefined;
     ch.handoffNotificationError = undefined;
