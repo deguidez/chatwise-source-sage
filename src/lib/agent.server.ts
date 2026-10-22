@@ -49,7 +49,10 @@ async function callAI(s: Settings, system: string, turns: Turn[]): Promise<strin
     return (json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("").trim();
   }
   if (s.aiProvider === "ollama") {
-    const res = await fetch(`${(s.ollamaUrl || "http://localhost:11434").replace(/\/$/, "")}/api/chat`, {
+    // Fix common typos in the saved address ("ttps://", missing scheme, trailing slash).
+    let base = (s.ollamaUrl || "http://localhost:11434").trim().replace(/\/+$/, "").replace(/\/api\/(chat|tags)$/, "");
+    base = base.replace(/^h?t?t?p?s?:?\/*(?=[a-z0-9])/i, (m) => (/^h?t?tps/i.test(m) ? "https://" : m.toLowerCase().startsWith("http:") ? "http://" : "https://"));
+    const res = await fetch(`${base}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: s.ollamaModel || "llama3.1", stream: false, messages: [{ role: "system", content: system }, ...turns] }),
