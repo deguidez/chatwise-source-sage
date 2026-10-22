@@ -1,0 +1,61 @@
+# Stack para Portainer + Traefik.
+# Troque: SEU_DOMINIO, senhas e o nome da rede/certresolver do seu Traefik.
+services:
+  app:
+    build: .
+    image: whatsagent:latest
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: whatsagent
+      DB_USER: whatsagent
+      DB_PASSWORD: TROQUE_SENHA_DB
+      COOKIE_SECURE: "true"
+      LOVABLE_CRON_SECRET: TROQUE_SEGREDO_CRON
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      - mysql
+    networks:
+      - interna
+      - traefik_public
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_public
+      - traefik.http.routers.whatsagent.rule=Host(`SEU_DOMINIO`)
+      - traefik.http.routers.whatsagent.entrypoints=websecure
+      - traefik.http.routers.whatsagent.tls.certresolver=letsencrypt
+      - traefik.http.services.whatsagent.loadbalancer.server.port=3000
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: whatsagent
+      MYSQL_USER: whatsagent
+      MYSQL_PASSWORD: TROQUE_SENHA_DB
+      MYSQL_ROOT_PASSWORD: TROQUE_SENHA_ROOT
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - interna
+
+  # Lembrete de inatividade: chama o sistema a cada minuto
+  cron:
+    image: curlimages/curl:latest
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "while true; do curl -s -X POST -H 'Authorization: Bearer TROQUE_SEGREDO_CRON' http://app:3000/api/public/jobs/inactivity >/dev/null; sleep 60; done"]
+    depends_on:
+      - app
+    networks:
+      - interna
+
+volumes:
+  app_data:
+  mysql_data:
+
+networks:
+  interna:
+  traefik_public:
+    external: true
