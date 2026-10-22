@@ -61,6 +61,8 @@ export type ChatState = {
   /** Attendance queue state in the app: waiting in queue, being handled, or resolved. */
   ticketStatus?: "queue" | "open" | "resolved" | undefined;
   closedAt?: string | undefined;
+  /** Username of the attendant who took the conversation in the app. */
+  handledBy?: string | undefined;
   messages: ChatMessage[];
 };
 export type Conversations = {
