@@ -83,6 +83,7 @@ function LoginPage() {
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? "Entrando..." : "Entrar"}
         </Button>
+        <p className="text-center text-xs text-muted-foreground">© 2026 Fotogrer — Todos os direitos reservados</p>
       </form>
     </div>
   );
