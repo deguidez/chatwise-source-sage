@@ -380,8 +380,10 @@ export async function getMetrics(from: string, to: string): Promise<MetricEvent[
   if (cfg.driver === "cloud") {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const events: MetricEvent[] = [];
+    const start = `${from}T03:00:00.000Z`;
+    const end = new Date(Date.parse(`${to}T03:00:00.000Z`) + 86400000).toISOString();
     for (let offset = 0; ; offset += 1000) {
-      const { data, error } = await supabaseAdmin.from("app_data").select("data").gte("name", low).lte("name", high).order("name").range(offset, offset + 999);
+      const { data, error } = await supabaseAdmin.from("app_data").select("data").like("name", "metric-%").gte("data->>at", start).lt("data->>at", end).order("name").range(offset, offset + 999);
       if (error) throw new Error("Não foi possível carregar os números");
       events.push(...(data ?? []).map((row) => row.data as unknown as MetricEvent));
       if (!data || data.length < 1000) break;

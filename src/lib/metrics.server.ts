@@ -22,7 +22,7 @@ export async function aiFetch(url: string, init: RequestInit, provider: string, 
 }
 
 export async function whatsAppFetch(url: string, init: RequestInit, channel: string, number: string, source: string, mediaKind = "text") {
-  const chat = Object.values((await getConversations()).chats).find((c) => c.number === number);
+  const chat = Object.values((await getConversations()).chats).find((c) => c.number === number && c.channel === channel);
   const context = { channel, source, mediaKind, companyId: chat?.companyId, actor: source === "attendant" ? chat?.handledBy : undefined };
   try {
     const res = await fetch(url, init);

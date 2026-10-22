@@ -401,9 +401,8 @@ export const loadMetrics = createServerFn({ method: "GET" })
   .inputValidator(z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
   .handler(async ({ data }) => {
     await guardSuper();
-    const from = Date.parse(data.from);
-    const to = Date.parse(data.to);
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || to - from > 366 * 86400000) throw new Error("Escolha um período válido de até um ano");
+    const { validMetricPeriod } = await import("./metrics-core");
+    if (!validMetricPeriod(data.from, data.to)) throw new Error("Escolha um período válido de até um ano");
     const st = await store();
     const [events, conversations, settings, users] = await Promise.all([st.getMetrics(data.from, data.to), st.getConversations(), st.getSettings(), st.getAuth()]);
     const { queueTab } = await import("./agent-core");

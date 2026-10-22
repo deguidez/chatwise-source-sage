@@ -28,6 +28,11 @@ export function providerUsage(provider: string, body: any) {
 
 export const metricDay = (at: string) => new Date(at).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
+export function validMetricPeriod(from: string, to: string) {
+  const valid = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+  return valid(from) && valid(to) && from <= to && Date.parse(to) - Date.parse(from) <= 366 * 86400000;
+}
+
 export function summarizeMetrics(events: MetricEvent[]) {
   const count = (type: MetricEvent["type"]) => events.filter((e) => e.type === type).length;
   const ai = events.filter((e) => e.type === "ai");

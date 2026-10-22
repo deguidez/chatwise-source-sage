@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metricsCsv, providerUsage, summarizeMetrics, type MetricEvent } from "@/lib/metrics-core";
+import { metricsCsv, providerUsage, summarizeMetrics, validMetricPeriod, type MetricEvent } from "@/lib/metrics-core";
 
 describe("Consumo de API", () => {
   it("captura os tokens informados por Gemini, incluindo raciocínio no total", () => {
@@ -27,4 +27,10 @@ it("CSV exporta tokens e protege contra fórmulas", () => {
   expect(csv).toContain('"123"');
   expect(csv).toContain('"\'=HYPERLINK(""bad"")"');
   expect(csv.charCodeAt(0)).toBe(0xfeff);
+});
+
+it("rejeita datas impossíveis e períodos invertidos", () => {
+  expect(validMetricPeriod("2026-02-31", "2026-03-01")).toBe(false);
+  expect(validMetricPeriod("2026-10-22", "2026-10-21")).toBe(false);
+  expect(validMetricPeriod("2026-10-01", "2026-10-22")).toBe(true);
 });
