@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, BookOpen, KeyRound, LogOut, MessageCircle, MessagesSquare, FlaskConical, Users, Zap } from "lucide-react";
+import { Building2, BookOpen, KeyRound, Lock, LogOut, MessageCircle, MessagesSquare, FlaskConical, Users, Zap } from "lucide-react";
 import { getAuthState, logout } from "@/lib/api.functions";
 import { KnowledgePanel } from "@/components/dashboard/KnowledgePanel";
 import { SettingsPanel } from "@/components/dashboard/SettingsPanel";
@@ -8,6 +8,7 @@ import { ConversationsPanel } from "@/components/dashboard/ConversationsPanel";
 import { CompaniesPanel } from "@/components/dashboard/CompaniesPanel";
 import { QuickRepliesPanel } from "@/components/dashboard/QuickRepliesPanel";
 import { UsersPanel } from "@/components/dashboard/UsersPanel";
+import { PasswordCard } from "@/components/dashboard/PasswordCard";
 import { TestPanel } from "@/components/dashboard/TestPanel";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ const tabs = [
   { id: "settings", label: "Chaves e conexões", icon: KeyRound, superOnly: true },
   { id: "users", label: "Usuários", icon: Users, superOnly: true },
   { id: "test", label: "Testar", icon: FlaskConical, superOnly: false },
+  { id: "account", label: "Minha conta", icon: Lock, superOnly: false },
 ] as const;
 
 function Dashboard() {
@@ -89,6 +91,7 @@ function Dashboard() {
           {tab === "test" && <TestPanel />}
           {tab === "chats" && <ConversationsPanel />}
           {tab === "quick" && <QuickRepliesPanel />}
+          {tab === "account" && <PasswordCard username={auth.username} />}
         </div>
         <footer className="mt-10 pb-2 text-center text-xs text-muted-foreground">
           © 2026 Fotogrer — Todos os direitos reservados
