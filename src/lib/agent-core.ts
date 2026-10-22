@@ -106,6 +106,43 @@ export function htmlToText(html: string): { title: string; text: string } {
   return { title, text };
 }
 
+/** Same-site page links found in the HTML (absolute, no hash, no files). */
+export function extractLinks(html: string, baseUrl: string): string[] {
+  const base = new URL(baseUrl);
+  const out = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)[^"']*["']/gi)) {
+    try {
+      const u = new URL(m[1]!, base);
+      u.hash = "";
+      if (u.hostname !== base.hostname || !/^https?:$/.test(u.protocol)) continue;
+      if (/\.(jpe?g|png|gif|webp|svg|pdf|zip|mp4|mp3|css|js|ico|xml)$/i.test(u.pathname)) continue;
+      out.add(u.toString());
+    } catch { /* ignore */ }
+  }
+  return [...out];
+}
+
+/** Images (absolute URL + description) found in the HTML, skipping icons/logos. */
+export function extractImages(html: string, baseUrl: string): { url: string; alt: string }[] {
+  const out = new Map<string, string>();
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+  const add = (src: string, alt: string) => {
+    try {
+      const u = new URL(src, baseUrl).toString();
+      if (!/^https?:/.test(u) || /data:|sprite|favicon|icon|pixel|\.svg/i.test(u)) return;
+      if (!out.has(u)) out.set(u, alt);
+    } catch { /* ignore */ }
+  };
+  if (og) add(og, "Imagem principal");
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const src = tag.match(/\b(?:data-src|src)=["']([^"']+)["']/i)?.[1];
+    if (!src) continue;
+    add(src, (tag.match(/\balt=["']([^"']*)["']/i)?.[1] ?? "").trim());
+  }
+  return [...out].map(([url, alt]) => ({ url, alt }));
+}
+
 /** Parse a YCloud "whatsapp.inbound_message.received" webhook. */
 export function parseYCloudWebhook(body: any): IncomingMessage | null {
   if (body?.type !== "whatsapp.inbound_message.received") return null;
