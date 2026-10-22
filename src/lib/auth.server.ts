@@ -85,7 +85,8 @@ export async function login(username: string, password: string) {
 export async function logout() {
   const token = getCookie(COOKIE);
   if (token) await updateAuth((d) => void (d.sessions = d.sessions.filter((s) => s.token !== token)));
-  deleteCookie(COOKIE, { path: "/" });
+  const https = isHttps();
+  deleteCookie(COOKIE, { path: "/", sameSite: https ? "none" : "lax", secure: https, partitioned: https });
 }
 
 export async function changePassword(current: string, next: string) {
