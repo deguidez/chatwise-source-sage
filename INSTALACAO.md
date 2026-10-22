@@ -39,6 +39,10 @@ Alternativa sem instalador: defina as variáveis `DB_HOST`, `DB_PORT`, `DB_NAME`
 - **Ollama (na VPS)**: `curl -fsSL https://ollama.com/install.sh | sh` e `ollama pull qwen2.5:7b`. Precisa de uns 8 GB de RAM.
 
 ## Chatwoot
+Em **Chaves e conexões → Atendimento humano**, escolha **Mesmo WhatsApp** para avisar o atendente em outro número com DDI. Ele responde pelo WhatsApp da empresa, e a IA fica pausada até clicar em **Conversas → Devolver para a IA**. Falhas de aviso aparecem em Conversas. Na YCloud, um aviso fora da janela de 24 horas pode exigir um modelo aprovado e ser recusado; essa opção envia avisos de texto.
+
+Para continuar usando o Chatwoot, escolha **Chatwoot** como destino e preencha os dados abaixo. Configurações já existentes continuam no modo Chatwoot.
+
 1. No Chatwoot, crie uma caixa de entrada do tipo **API** e anote o ID dela e o ID da conta (aparecem no endereço da página).
 2. Em Perfil, copie o **Token de acesso**.
 3. Em Configurações → Integrações → Webhooks, cole a URL do webhook do Chatwoot (mostrada no painel) e marque "Mensagem criada" e "Status da conversa alterado".

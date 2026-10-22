@@ -174,7 +174,21 @@ export function SettingsPanel() {
         )}
       </Section>
 
-      <Section title="Chatwoot (atendimento humano)">
+      <Section title="Atendimento humano">
+        <Field label="Destino do atendimento">
+          <div className="flex flex-wrap gap-2">
+            <Button variant={f.handoffProvider === "whatsapp" ? "default" : "outline"} aria-pressed={f.handoffProvider === "whatsapp"} onClick={() => set("handoffProvider", "whatsapp")}>Mesmo WhatsApp</Button>
+            <Button variant={f.handoffProvider === "chatwoot" ? "default" : "outline"} aria-pressed={f.handoffProvider === "chatwoot"} onClick={() => set("handoffProvider", "chatwoot")}>Chatwoot</Button>
+          </div>
+        </Field>
+        {f.handoffProvider === "whatsapp" && (
+          <Field label="WhatsApp do atendente para avisos" hint="Use outro número com DDI. O atendente responde pelo WhatsApp da empresa; ao terminar, clique em Devolver para a IA em Conversas. Na YCloud, avisos fora da janela de 24 horas podem ser recusados.">
+            <Input aria-label="WhatsApp do atendente para avisos" type="tel" value={f.attendantNumber} onChange={(e) => set("attendantNumber", e.target.value)} placeholder="+55…" />
+          </Field>
+        )}
+      </Section>
+
+      <Section title="Chatwoot">
         <Field label="URL do Chatwoot" hint="Ex: https://chat.seudominio.com"><Input value={f.chatwootUrl} onChange={(e) => set("chatwootUrl", e.target.value)} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="ID da conta"><Input value={f.chatwootAccountId} onChange={(e) => set("chatwootAccountId", e.target.value)} /></Field>

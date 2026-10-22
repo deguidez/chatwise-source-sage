@@ -19,6 +19,8 @@ export type Settings = {
   evolutionInstance: string;
   ycloudKey: string;
   ycloudFrom: string;
+  handoffProvider: "whatsapp" | "chatwoot";
+  attendantNumber: string;
   chatwootUrl: string;
   chatwootAccountId: string;
   chatwootToken: string;
@@ -50,6 +52,8 @@ export type ChatState = {
   stage: "menu" | "company" | "human";
   companyId?: string | undefined;
   chatwootConversationId?: number | undefined;
+  handoffProvider?: "whatsapp" | "chatwoot" | undefined;
+  handoffNotificationError?: string | undefined;
   inactivityReminderAt?: string | undefined;
   closed?: boolean | undefined;
   messages: ChatMessage[];
@@ -229,6 +233,8 @@ const settingsFallback = (): Settings => ({
   evolutionInstance: "",
   ycloudKey: "",
   ycloudFrom: "",
+  handoffProvider: "chatwoot",
+  attendantNumber: "",
   chatwootUrl: "",
   chatwootAccountId: "",
   chatwootToken: "",
