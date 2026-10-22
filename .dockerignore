@@ -4,3 +4,9 @@ dist
 data
 .git
 .env
+.env.*
+!.env.example
+.lovable
+.workspace
+coverage
+*.tsbuildinfo
