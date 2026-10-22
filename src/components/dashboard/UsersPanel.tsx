@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Trash2, UserPlus, Users, KeyRound } from "lucide-react";
-import { listUsers, createUser, deleteUser, resetUserPassword } from "@/lib/api.functions";
+import { ShieldCheck, Trash2, UserPlus, Users, KeyRound, Pencil } from "lucide-react";
+import { listUsers, createUser, deleteUser, resetUserPassword, updateUser } from "@/lib/api.functions";
 import { toast } from "sonner";
 
-type UserRow = { username: string; role: "super" | "attendant" };
+type UserRow = { username: string; role: "super" | "attendant"; name?: string };
 
 export function UsersPanel({ currentUser }: { currentUser: string }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"super" | "attendant">("attendant");
   const [resetFor, setResetFor] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState("");
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [editName, setEditName] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -29,9 +32,10 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
   const add = async () => {
     setBusy(true);
     try {
-      await createUser({ data: { username, password, role } });
+      await createUser({ data: { username, password, role, name } });
       toast.success(`Usuário ${username} criado`);
       setUsername("");
+      setName("");
       setPassword("");
       setRole("attendant");
       await load();
@@ -68,6 +72,23 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
     }
   };
 
+  const saveName = async () => {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await updateUser({ data: { username: editing.username, name: editName } });
+      toast.success("Nome atualizado");
+      setEditing(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar nome");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const displayName = (u: UserRow) => (u.name ? u.name : u.username);
+
   return (
     <div className="space-y-8">
       <section className="rounded-xl border bg-card p-6">
@@ -80,7 +101,8 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
         <ul className="divide-y">
           {users.map((u) => (
             <li key={u.username} className="flex flex-wrap items-center gap-3 py-3">
-              <span className="font-medium">{u.username}</span>
+              <span className="font-medium">{displayName(u)}</span>
+              {u.name && <span className="text-xs text-muted-foreground">({u.username})</span>}
               {u.username === currentUser && (
                 <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">você</span>
               )}
@@ -95,6 +117,15 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
                 {u.role === "super" ? "Super admin" : "Atendente"}
               </span>
               <span className="ml-auto flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditing(u);
+                    setEditName(u.name ?? "");
+                  }}
+                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-accent"
+                >
+                  <Pencil className="h-3 w-3" /> Editar nome
+                </button>
                 <button
                   onClick={() => {
                     setResetFor(u.username);
@@ -124,11 +155,20 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
         </h2>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="text-sm">
-            Usuário
+            Usuário (login)
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="ex.: maria"
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2"
+            />
+          </label>
+          <label className="text-sm">
+            Nome (exibido no atendimento)
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="ex.: Maria Silva"
               className="mt-1 w-full rounded-lg border bg-background px-3 py-2"
             />
           </label>
@@ -180,6 +220,35 @@ export function UsersPanel({ currentUser }: { currentUser: string }) {
               <button
                 onClick={() => void doReset()}
                 disabled={busy || resetPassword.length < 8}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl border bg-card p-6">
+            <h3 className="mb-1 font-display text-lg font-semibold">Editar nome</h3>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Usuário: {editing.username} — o login continua o mesmo.
+            </p>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Nome completo"
+              className="w-full rounded-lg border bg-background px-3 py-2"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2 text-sm">
+                Cancelar
+              </button>
+              <button
+                onClick={() => void saveName()}
+                disabled={busy}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 Salvar
