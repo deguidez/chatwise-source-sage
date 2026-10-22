@@ -77,7 +77,7 @@ export async function requireSuper() {
 export async function listUsers() {
   await requireSuper();
   const auth = await getAuth();
-  return auth.users.map((u) => ({ username: u.username, role: userRole(u) }));
+  return auth.users.map((u) => ({ username: u.username, role: userRole(u), name: u.name ?? "" }));
 }
 
 const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
