@@ -7,7 +7,22 @@ export type IncomingMessage = {
   name: string;
   text: string;
   isGroup: boolean;
+  /** Attachment info; the file itself is downloaded separately. */
+  media?: { kind: "image" | "video" | "audio" | "document" | "sticker"; mimetype: string; fileName?: string | undefined } | undefined;
+  /** Raw provider payload, needed to download the attachment. */
+  raw?: unknown;
 };
+
+/** Detect an attachment in an Evolution message object. */
+export function evolutionMedia(m: any): IncomingMessage["media"] {
+  if (m?.imageMessage) return { kind: "image", mimetype: m.imageMessage.mimetype ?? "image/jpeg" };
+  if (m?.videoMessage) return { kind: "video", mimetype: m.videoMessage.mimetype ?? "video/mp4" };
+  if (m?.audioMessage) return { kind: "audio", mimetype: m.audioMessage.mimetype ?? "audio/ogg" };
+  if (m?.stickerMessage) return { kind: "sticker", mimetype: m.stickerMessage.mimetype ?? "image/webp" };
+  const doc = m?.documentMessage ?? m?.documentWithCaptionMessage?.message?.documentMessage;
+  if (doc) return { kind: "document", mimetype: doc.mimetype ?? "application/octet-stream", fileName: doc.fileName ?? doc.title };
+  return undefined;
+}
 
 /** Parse an Evolution API "messages.upsert" webhook. Returns null when there's nothing to answer. */
 export function parseEvolutionWebhook(body: any): IncomingMessage | null {
@@ -25,9 +40,14 @@ export function parseEvolutionWebhook(body: any): IncomingMessage | null {
     m.extendedTextMessage?.text ??
     m.imageMessage?.caption ??
     m.videoMessage?.caption ??
+    m.documentMessage?.caption ??
+    m.documentWithCaptionMessage?.message?.documentMessage?.caption ??
     "";
-  if (!text.trim()) return null;
+  const media = evolutionMedia(m);
+  if (!text.trim() && !media) return null;
   return {
+    media,
+    raw: data,
     id: String(data.key.id ?? ""),
     jid,
     number: jid.split("@")[0] ?? "",
@@ -243,6 +263,20 @@ export function parseEvolutionOwnMessage(body: any): { jid: string; text: string
   const m = data.message ?? {};
   const text: string = m.conversation ?? m.extendedTextMessage?.text ?? "";
   return text.trim() ? { jid, text: text.trim() } : null;
+}
+
+/** Queue tab a conversation belongs to in the attendance screen. */
+export type QueueTab = "ai" | "queue" | "open" | "resolved";
+export function queueTab(chat: { stage: string; closed?: boolean | undefined; ticketStatus?: string | undefined }): QueueTab {
+  if (chat.closed || chat.ticketStatus === "resolved") return "resolved";
+  if (chat.stage === "human") return chat.ticketStatus === "open" ? "open" : "queue";
+  return "ai";
+}
+
+/** Fill {{nome}} in a quick reply with the customer's first name. */
+export function fillQuickReply(text: string, name: string) {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  return text.replace(/\{\{\s*nome\s*\}\}/gi, first).replace(/ {2,}/g, " ");
 }
 
 /** Attendant phrase that ends a human conversation, e.g. "Irei encerrar o seu atendimento". */

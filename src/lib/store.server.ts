@@ -44,7 +44,9 @@ export type KnowledgeItem = {
   createdAt: string;
 };
 
-export type ChatMessage = { role: "user" | "assistant" | "agent"; content: string; at: string };
+export type MediaKind = "image" | "video" | "audio" | "document" | "sticker";
+export type ChatMedia = { id: string; kind: MediaKind; mimetype: string; fileName?: string | undefined };
+export type ChatMessage = { role: "user" | "assistant" | "agent"; content: string; at: string; media?: ChatMedia | undefined };
 export type ChatState = {
   name: string;
   number: string;
@@ -56,6 +58,9 @@ export type ChatState = {
   handoffNotificationError?: string | undefined;
   inactivityReminderAt?: string | undefined;
   closed?: boolean | undefined;
+  /** Attendance queue state in the app: waiting in queue, being handled, or resolved. */
+  ticketStatus?: "queue" | "open" | "resolved" | undefined;
+  closedAt?: string | undefined;
   messages: ChatMessage[];
 };
 export type Conversations = {
@@ -317,3 +322,23 @@ const authFallback = (): AuthData => ({
 });
 export const getAuth = () => readJson<AuthData>("auth.json", authFallback());
 export const updateAuth = (fn: (a: AuthData) => void) => update<AuthData>("auth.json", authFallback(), fn);
+
+// ---------- Media files (one document per file) ----------
+export type StoredMedia = { mimetype: string; fileName?: string | undefined; data: string };
+export async function saveMedia(media: StoredMedia): Promise<string> {
+  const id = `media-${randomUUID()}`;
+  await writeJson(id, media);
+  return id;
+}
+export async function getMedia(id: string): Promise<StoredMedia | null> {
+  if (!/^media-[0-9a-f-]{36}$/.test(id)) return null;
+  const m = await readJson<StoredMedia>(id, { mimetype: "", data: "" });
+  return m.data ? m : null;
+}
+
+// ---------- Quick replies ----------
+export type QuickReply = { id: string; shortcut: string; text: string };
+export const getQuickReplies = async () =>
+  (await readJson<{ items: QuickReply[] }>("quick-replies.json", { items: [] })).items;
+export const updateQuickReplies = (fn: (items: QuickReply[]) => QuickReply[]) =>
+  update<{ items: QuickReply[] }>("quick-replies.json", { items: [] }, (d) => ({ items: fn(d.items) }));
