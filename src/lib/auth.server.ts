@@ -82,7 +82,7 @@ export async function listUsers() {
 
 const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
 
-export async function createUser(username: string, password: string, role: "super" | "attendant") {
+export async function createUser(username: string, password: string, role: "super" | "attendant", name = "") {
   await requireSuper();
   const user = username.trim().toLowerCase();
   if (!USERNAME_RE.test(user)) throw new Error("Usuário inválido: use 3 a 30 letras, números, ponto, traço ou underline");
@@ -91,7 +91,18 @@ export async function createUser(username: string, password: string, role: "supe
   if (auth.users.some((u) => u.username === user)) throw new Error("Já existe um usuário com esse nome");
   const salt = randomBytes(16).toString("hex");
   await updateAuth((d) => {
-    d.users.push({ username: user, salt, hash: hash(password, salt), role });
+    d.users.push({ username: user, salt, hash: hash(password, salt), role, name: name.trim().slice(0, 60) });
+  });
+}
+
+export async function updateUser(username: string, name: string) {
+  await requireSuper();
+  const user = username.trim().toLowerCase();
+  const auth = await getAuth();
+  if (!auth.users.some((u) => u.username === user)) throw new Error("Usuário não encontrado");
+  await updateAuth((d) => {
+    const u = d.users.find((x) => x.username === user)!;
+    u.name = name.trim().slice(0, 60);
   });
 }
 
