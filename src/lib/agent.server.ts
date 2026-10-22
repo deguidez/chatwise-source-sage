@@ -222,6 +222,30 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 
   const transfer = async (): Promise<string> => {
     const companyName = s.companies.find((c) => c.id === chat.companyId)?.name ?? "Sem empresa";
+    const waTranscript = () =>
+      [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "*Cliente:*" : "*IA:*"} ${m.content}`).join("\n").slice(-3000);
+    if (s.handoffProvider === "other") {
+      const out = await reply(`Certo! Para continuar com um atendente, chame neste WhatsApp: https://wa.me/${s.attendantNumber} 🙂`);
+      // Customer continues on another number: end this chat so the next message starts at the menu.
+      await saveChat(msg.jid, (c) => {
+        c.messages.push(userMsg, out);
+        c.stage = "menu";
+        c.closed = true;
+        c.handoffProvider = "other";
+        c.chatwootConversationId = undefined;
+        c.handoffNotificationError = undefined;
+      }, base);
+      try {
+        if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para o atendente");
+        await sendWhatsApp(s, channel, s.attendantNumber, `*Cliente encaminhado para você — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`);
+        return "transferred-other";
+      } catch (error) {
+        await saveChat(msg.jid, (c) => {
+          c.handoffNotificationError = error instanceof Error ? error.message : "Falha ao avisar atendente";
+        }, base);
+        return "human-notification-failed";
+      }
+    }
     if (s.handoffProvider === "whatsapp") {
       const out = await reply("Certo! Um atendente vai continuar seu atendimento aqui neste WhatsApp. Aguarde um instante. 🙂");
       // Pause durably before notifying staff, even if notification delivery fails.
@@ -234,8 +258,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       }, base);
       try {
         if (!s.attendantNumber || s.attendantNumber === msg.number) throw new Error("Configure outro número para os avisos ao atendente");
-        const transcript = [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "**Cliente:**" : "**IA:**"} ${m.content}`).join("\n").slice(-3000);
-        await sendWhatsApp(s, channel, s.attendantNumber, `Atendimento humano solicitado — ${companyName}\nCliente: ${chat.name || msg.number}\nWhatsApp: +${msg.number}\n\n${transcript}`);
+        await sendWhatsApp(s, channel, s.attendantNumber, `*Atendimento humano solicitado — ${companyName}*\n*Nome:* ${chat.name || msg.number}\n*WhatsApp:* +${msg.number}\n\n*Resumo:*\n${waTranscript()}`);
         return "transferred-whatsapp";
       } catch (error) {
         await saveChat(msg.jid, (c) => {

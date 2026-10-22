@@ -178,12 +178,18 @@ export function SettingsPanel() {
         <Field label="Destino do atendimento">
           <div className="flex flex-wrap gap-2">
             <Button variant={f.handoffProvider === "whatsapp" ? "default" : "outline"} aria-pressed={f.handoffProvider === "whatsapp"} onClick={() => set("handoffProvider", "whatsapp")}>Mesmo WhatsApp</Button>
+            <Button variant={f.handoffProvider === "other" ? "default" : "outline"} aria-pressed={f.handoffProvider === "other"} onClick={() => set("handoffProvider", "other")}>Outro número</Button>
             <Button variant={f.handoffProvider === "chatwoot" ? "default" : "outline"} aria-pressed={f.handoffProvider === "chatwoot"} onClick={() => set("handoffProvider", "chatwoot")}>Chatwoot</Button>
           </div>
         </Field>
         {f.handoffProvider === "whatsapp" && (
           <Field label="WhatsApp do atendente para avisos" hint="Use outro número com DDI. O atendente responde pelo WhatsApp da empresa; ao terminar, clique em Devolver para a IA em Conversas. Na YCloud, avisos fora da janela de 24 horas podem ser recusados.">
             <Input aria-label="WhatsApp do atendente para avisos" type="tel" value={f.attendantNumber} onChange={(e) => set("attendantNumber", e.target.value)} placeholder="+55…" />
+          </Field>
+        )}
+        {f.handoffProvider === "other" && (
+          <Field label="WhatsApp do atendente" hint="Com DDI. O cliente recebe um link para chamar este número, e o atendente recebe o resumo da conversa. A IA encerra o atendimento no número da empresa.">
+            <Input aria-label="WhatsApp do atendente" type="tel" value={f.attendantNumber} onChange={(e) => set("attendantNumber", e.target.value)} placeholder="+55…" />
           </Field>
         )}
       </Section>
