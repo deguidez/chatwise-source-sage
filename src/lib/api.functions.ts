@@ -12,14 +12,14 @@ export const getAuthState = createServerFn({ method: "GET" }).handler(async () =
 );
 
 export const setupPassword = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ password: z.string().min(8).max(200) }))
+  .validator(z.object({ password: z.string().min(8).max(200) }))
   .handler(async ({ data }) => {
     await (await auth()).setupPassword(data.password);
     return { ok: true };
   });
 
 export const login = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ password: z.string().min(1).max(200) }))
+  .validator(z.object({ password: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
     await (await auth()).login(data.password);
     return { ok: true };
@@ -31,7 +31,7 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const changePassword = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ current: z.string().min(1), next: z.string().min(8).max(200) }))
+  .validator(z.object({ current: z.string().min(1), next: z.string().min(8).max(200) }))
   .handler(async ({ data }) => {
     await guard();
     await (await auth()).changePassword(data.current, data.next);
@@ -60,7 +60,7 @@ const settingsSchema = z.object({
 });
 
 export const saveSettings = createServerFn({ method: "POST" })
-  .inputValidator(settingsSchema)
+  .validator(settingsSchema)
   .handler(async ({ data }) => {
     await guard();
     await (await store()).updateSettings((s) => {
@@ -100,7 +100,7 @@ async function addItem(type: "text" | "pdf" | "url" | "file", title: string, con
 }
 
 export const addText = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     z.object({
       title: z.string().max(200),
       content: z.string().min(1).max(2_000_000),
@@ -113,7 +113,7 @@ export const addText = createServerFn({ method: "POST" })
   });
 
 export const addUrl = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ url: z.string().url().max(2000) }))
+  .validator(z.object({ url: z.string().url().max(2000) }))
   .handler(async ({ data }) => {
     await guard();
     const { htmlToText } = await import("./agent-core");
@@ -124,7 +124,7 @@ export const addUrl = createServerFn({ method: "POST" })
   });
 
 export const addPdf = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ name: z.string().max(300), base64: z.string().max(30_000_000) }))
+  .validator(z.object({ name: z.string().max(300), base64: z.string().max(30_000_000) }))
   .handler(async ({ data }) => {
     await guard();
     const { extractText, getDocumentProxy } = await import("unpdf");
@@ -135,7 +135,7 @@ export const addPdf = createServerFn({ method: "POST" })
   });
 
 export const deleteKnowledge = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
     await guard();
     await (await store()).updateKnowledge((items) => items.filter((i) => i.id !== data.id));
@@ -151,7 +151,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
 });
 
 export const testAgent = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     z.object({
       message: z.string().min(1).max(4000),
       history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() })).max(20),

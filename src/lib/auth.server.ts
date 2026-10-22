@@ -10,7 +10,7 @@ function startSession(token: string) {
   setCookie(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.COOKIE_SECURE === "true",
+    secure: process.env["COOKIE_SECURE"] === "true",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });

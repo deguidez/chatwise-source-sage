@@ -30,7 +30,7 @@ export function parseEvolutionWebhook(body: any): IncomingMessage | null {
   return {
     id: String(data.key.id ?? ""),
     jid,
-    number: jid.split("@")[0],
+    number: jid.split("@")[0] ?? "",
     name: data.pushName ?? "",
     text: text.trim(),
     isGroup: jid.endsWith("@g.us"),
