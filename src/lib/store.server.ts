@@ -169,7 +169,7 @@ async function readJson<T>(name: string, fallback: T): Promise<T> {
     }
     return raw ? ({ ...fallback, ...JSON.parse(raw) } as T) : fallback;
   } catch (e: any) {
-    if (cfg.driver === "mysql") throw e;
+    if (cfg.driver !== "file") throw e;
     return fallback;
   }
 }
