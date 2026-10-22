@@ -192,7 +192,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
