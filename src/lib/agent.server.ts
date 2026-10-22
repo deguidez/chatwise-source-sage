@@ -8,7 +8,10 @@ import {
   updateConversations,
   type ChatMessage,
   type ChatState,
+  type ChatMedia,
   type Settings,
+  saveMedia,
+  getMedia,
 } from "./store.server";
 
 // ---------------- AI providers ----------------
@@ -119,6 +122,52 @@ export async function sendWhatsApp(s: Settings, channel: ChatState["channel"], n
   if (!res.ok) throw new Error(`Evolution [${res.status}]: ${(await res.text()).slice(0, 300)}`);
 }
 
+export type OutgoingMedia = { kind: ChatMedia["kind"]; mimetype: string; fileName?: string | undefined; data: string; caption?: string | undefined };
+
+/** Send a photo, video, audio or file through Evolution (base64 body). */
+export async function sendWhatsAppMedia(s: Settings, channel: ChatState["channel"], number: string, media: OutgoingMedia) {
+  if (channel === "ycloud") throw new Error("Envio de anexos pelo app está disponível apenas com a Evolution");
+  const { evolutionUrl, evolutionKey, evolutionInstance } = s;
+  if (!evolutionUrl || !evolutionKey || !evolutionInstance) throw new Error("Evolution API não configurada");
+  const base = `${evolutionUrl.replace(/\/$/, "")}/message`;
+  const inst = encodeURIComponent(evolutionInstance);
+  const [url, body] = media.kind === "audio"
+    ? [`${base}/sendWhatsAppAudio/${inst}`, { number, audio: media.data }]
+    : [`${base}/sendMedia/${inst}`, {
+        number,
+        mediatype: media.kind === "sticker" ? "image" : media.kind,
+        mimetype: media.mimetype,
+        media: media.data,
+        fileName: media.fileName || `arquivo.${media.mimetype.split("/")[1]?.split(";")[0] || "bin"}`,
+        ...(media.caption ? { caption: media.caption } : {}),
+      }];
+  const res = await fetch(url, { method: "POST", headers: { apikey: evolutionKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`Evolution [${res.status}]: ${(await res.text()).slice(0, 300)}`);
+}
+
+/** Download an incoming attachment from Evolution and store it. */
+async function storeIncomingMedia(s: Settings, msg: IncomingMessage): Promise<ChatMedia | undefined> {
+  if (!msg.media) return undefined;
+  try {
+    const res = await fetch(`${s.evolutionUrl.replace(/\/$/, "")}/chat/getBase64FromMediaMessage/${encodeURIComponent(s.evolutionInstance)}`, {
+      method: "POST",
+      headers: { apikey: s.evolutionKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg.raw, convertToMp4: msg.media.kind === "video" }),
+    });
+    if (!res.ok) throw new Error(`Evolution [${res.status}]: ${(await res.text()).slice(0, 200)}`);
+    const json = await res.json();
+    const data = String(json.base64 ?? "");
+    if (!data) throw new Error("arquivo vazio");
+    if (data.length > 22_000_000) throw new Error("arquivo grande demais");
+    const mimetype = String(json.mimetype || msg.media.mimetype).split(";")[0] ?? msg.media.mimetype;
+    const id = await saveMedia({ mimetype, fileName: msg.media.fileName, data });
+    return { id, kind: msg.media.kind, mimetype, fileName: msg.media.fileName };
+  } catch (error) {
+    console.error("Download de anexo falhou:", error);
+    return undefined;
+  }
+}
+
 // ---------------- Chatwoot ----------------
 const chatwootReady = (s: Settings) => !!(s.chatwootUrl && s.chatwootAccountId && s.chatwootToken && s.chatwootInboxId);
 
@@ -177,9 +226,9 @@ export async function recordStaffMessage(jid: string, text: string) {
     const chat = c.chats[jid];
     if (!chat || chat.stage !== "human" || chat.handoffProvider !== "whatsapp") return;
     // Our own automatic messages also echo back as "sent by the company"; skip them.
-    if (chat.messages.slice(-6).some((m) => m.role === "assistant" && m.content === text)) return;
+    if (chat.messages.slice(-6).some((m) => m.role !== "user" && m.content === text)) return;
     chat.messages.push({ role: "agent", content: text, at: now() });
-    chat.messages = chat.messages.slice(-60);
+    chat.messages = chat.messages.slice(-200);
     saved = true;
   });
   return saved ? "staff-recorded" : "ignored";
@@ -191,7 +240,7 @@ async function saveChat(jid: string, fn: (c: ChatState) => void, base: ChatState
     const chat = c.chats[jid] ?? base;
     fn(chat);
     if (chat.messages.at(-1)?.role === "user") chat.inactivityReminderAt = undefined;
-    chat.messages = chat.messages.slice(-60);
+    chat.messages = chat.messages.slice(-200);
     c.chats[jid] = chat;
   });
 }
@@ -214,8 +263,15 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     chat.closed = false;
     chat.stage = "menu";
     chat.companyId = undefined;
+    chat.ticketStatus = undefined;
   }
-  const userMsg: ChatMessage = { role: "user", content: msg.text, at: now() };
+  const media = msg.media && channel === "evolution" ? await storeIncomingMedia(s, msg) : undefined;
+  const userMsg: ChatMessage = { role: "user", content: msg.text || (msg.media ? "" : ""), at: now(), ...(media ? { media } : {}) };
+  // Attachments without text cannot be read by the AI: keep them for the attendant.
+  if (!msg.text && chat.stage !== "human") {
+    await saveChat(msg.jid, (c) => { c.messages.push(userMsg); c.closed = false; c.ticketStatus = undefined; if (!c.name && msg.name) c.name = msg.name; }, { ...base, ...chat });
+    return "media-stored";
+  }
   const reply = async (text: string) => {
     await sendWhatsApp(s, channel, msg.number, text);
     return { role: "assistant" as const, content: text, at: now() };
@@ -237,12 +293,14 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }
 
   await saveChat(msg.jid, (c) => {
+    if (c.closed) c.ticketStatus = undefined;
     c.closed = false;
     c.inactivityReminderAt = undefined;
+    if (msg.name) c.name = msg.name;
   }, base);
 
   if (route.kind === "silent") {
-    if (chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
+    if (msg.text && chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
     await saveChat(msg.jid, (c) => c.messages.push(userMsg), base);
     // Reassure the customer while waiting, at most once every 5 minutes.
     const lastNotice = [...chat.messages].reverse().find((m) => m.role === "assistant" && m.content === HUMAN_WAIT_MESSAGE);
@@ -289,6 +347,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       await saveChat(msg.jid, (c) => {
         c.messages.push(userMsg, out);
         c.stage = "human";
+        c.ticketStatus = "queue";
         c.handoffProvider = "whatsapp";
         c.chatwootConversationId = undefined;
         c.handoffNotificationError = undefined;
@@ -306,13 +365,13 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     }
     if (!chatwootReady(s)) {
       const out = await reply("Vou te encaminhar para um atendente. Em breve alguém vai falar com você.");
-      await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.handoffProvider = "chatwoot"; }, base);
+      await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.ticketStatus = "queue"; c.handoffProvider = "chatwoot"; }, base);
       return "human-no-chatwoot";
     }
     const out = await reply("Certo! Vou transferir você para um dos nossos atendentes. Aguarde só um instante. 🙂");
     const tmp = { ...chat, messages: [...chat.messages, userMsg, out] };
     const conversationId = await openChatwootConversation(s, tmp, companyName);
-    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.handoffProvider = "chatwoot"; c.chatwootConversationId = conversationId; }, base);
+    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.ticketStatus = "queue"; c.handoffProvider = "chatwoot"; c.chatwootConversationId = conversationId; }, base);
     return "transferred";
   };
 
@@ -360,7 +419,7 @@ export async function sendInactivityReminders(time = Date.now()) {
         const latest = c.chats[jid];
         if (!latest) return;
         latest.messages.push({ role: "assistant", content: INACTIVITY_QUESTION, at: now() });
-        latest.messages = latest.messages.slice(-60);
+        latest.messages = latest.messages.slice(-200);
       });
       sent++;
     } catch {
@@ -382,7 +441,7 @@ export async function sendInactivityReminders(time = Date.now()) {
       latest.stage = "menu";
       latest.companyId = undefined;
       latest.messages.push({ role: "assistant", content: AUTO_CLOSE_MESSAGE, at: now() });
-      latest.messages = latest.messages.slice(-60);
+      latest.messages = latest.messages.slice(-200);
       target = { number: latest.number, channel: latest.channel };
     });
     const t = target as { number: string; channel: typeof conversations.chats[string]["channel"] } | null;
@@ -420,6 +479,8 @@ export async function closeByStaff(jid: string) {
     snapshot = structuredClone(chat);
     chat.stage = "menu";
     chat.closed = true;
+    chat.ticketStatus = "resolved";
+    chat.closedAt = now();
     chat.companyId = undefined;
     chat.handoffProvider = undefined;
     chat.handoffNotificationError = undefined;
@@ -486,3 +547,81 @@ export async function returnToAI(jid: string) {
   });
   await learnFromChat(snapshot).catch((e) => console.error("Aprendizado falhou:", e));
 }
+
+// ---------------- Attendance from the app ----------------
+const RESOLVED_MESSAGE = "Seu atendimento foi finalizado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem. 😊";
+
+/** Attendant takes the chat: the AI stops answering it. */
+export async function assumeChat(jid: string) {
+  await updateConversations((c) => {
+    const ch = c.chats[jid];
+    if (!ch) throw new Error("Conversa não encontrada");
+    if (ch.stage !== "human") { ch.handoffProvider = "whatsapp"; ch.chatwootConversationId = undefined; }
+    ch.stage = "human";
+    ch.closed = false;
+    ch.ticketStatus = "open";
+    ch.inactivityReminderAt = undefined;
+  });
+}
+
+/** Attendant sends a text and/or attachment from the app. */
+export async function agentSend(jid: string, text: string, media?: OutgoingMedia) {
+  const s = await getSettings();
+  const chat = (await getConversations()).chats[jid];
+  if (!chat) throw new Error("Conversa não encontrada");
+  await assumeChat(jid);
+  let stored: ChatMedia | undefined;
+  if (media) {
+    await sendWhatsAppMedia(s, chat.channel, chat.number, { ...media, caption: text || undefined });
+    const id = await saveMedia({ mimetype: media.mimetype, fileName: media.fileName, data: media.data });
+    stored = { id, kind: media.kind, mimetype: media.mimetype, fileName: media.fileName };
+  } else {
+    if (!text.trim()) throw new Error("Mensagem vazia");
+    await sendWhatsApp(s, chat.channel, chat.number, text);
+  }
+  await updateConversations((c) => {
+    const ch = c.chats[jid];
+    if (!ch) return;
+    ch.messages.push({ role: "agent", content: text, at: now(), ...(stored ? { media: stored } : {}) });
+    ch.messages = ch.messages.slice(-200);
+  });
+}
+
+/** Resolve: tell the customer, move to "Finalizados" and learn from the answers. */
+export async function resolveChat(jid: string, notify = true) {
+  const s = await getSettings();
+  let snapshot: ChatState | undefined;
+  const chat = (await getConversations()).chats[jid];
+  if (!chat) throw new Error("Conversa não encontrada");
+  if (notify) await sendWhatsApp(s, chat.channel, chat.number, RESOLVED_MESSAGE).catch((e) => console.error("Aviso de finalização falhou:", e));
+  await updateConversations((c) => {
+    const ch = c.chats[jid];
+    if (!ch) return;
+    if (ch.stage === "human") snapshot = structuredClone(ch);
+    ch.stage = "menu";
+    ch.closed = true;
+    ch.ticketStatus = "resolved";
+    ch.closedAt = now();
+    ch.companyId = ch.companyId;
+    ch.handoffProvider = undefined;
+    ch.chatwootConversationId = undefined;
+    ch.handoffNotificationError = undefined;
+    ch.inactivityReminderAt = undefined;
+    if (notify) ch.messages.push({ role: "assistant", content: RESOLVED_MESSAGE, at: now() });
+  });
+  await learnFromChat(snapshot).catch((e) => console.error("Aprendizado falhou:", e));
+}
+
+/** Reopen a finished conversation with the attendant. */
+export async function reopenChat(jid: string) {
+  await assumeChat(jid);
+}
+
+export async function renameChat(jid: string, name: string) {
+  await updateConversations((c) => {
+    const ch = c.chats[jid];
+    if (ch) ch.name = name;
+  });
+}
+
+export { getMedia };
