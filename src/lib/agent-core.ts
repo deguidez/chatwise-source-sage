@@ -137,7 +137,7 @@ export type Route =
 
 /** Decide what to do with an incoming message given the conversation state. */
 export function routeMessage(
-  state: { stage: "menu" | "company" | "human"; companyId?: string } | undefined,
+  state: { stage: "menu" | "company" | "human"; companyId?: string | undefined } | undefined,
   text: string,
   companies: { id: string; name: string }[],
   humanOption: boolean,

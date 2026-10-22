@@ -102,11 +102,11 @@ async function mysqlPool(cfg: DbConfig) {
   if (pool && poolKey === key) return pool;
   const mysql = await import("mysql2/promise");
   pool = mysql.createPool({
-    host: cfg.host,
+    host: cfg.host ?? "localhost",
     port: cfg.port || 3306,
-    database: cfg.database,
-    user: cfg.user,
-    password: cfg.password,
+    database: cfg.database ?? "",
+    user: cfg.user ?? "",
+    password: cfg.password ?? "",
     connectionLimit: 5,
     charset: "utf8mb4",
   });
