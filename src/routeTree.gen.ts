@@ -14,6 +14,7 @@ import { Route as InstallRouteImport } from './routes/install'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiPublicChatwootWebhookRouteImport } from './routes/api/public/chatwoot/webhook'
 import { Route as ApiPublicEvolutionWebhookRouteImport } from './routes/api/public/evolution/webhook'
+import { Route as ApiPublicJobsInactivityRouteImport } from './routes/api/public/jobs/inactivity'
 import { Route as ApiPublicYcloudWebhookRouteImport } from './routes/api/public/ycloud/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +44,11 @@ const ApiPublicEvolutionWebhookRoute =
     path: '/api/public/evolution/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicJobsInactivityRoute = ApiPublicJobsInactivityRouteImport.update({
+  id: '/api/public/jobs/inactivity',
+  path: '/api/public/jobs/inactivity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicYcloudWebhookRoute = ApiPublicYcloudWebhookRouteImport.update({
   id: '/api/public/ycloud/webhook',
   path: '/api/public/ycloud/webhook',
@@ -55,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/jobs/inactivity': typeof ApiPublicJobsInactivityRoute
   '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -63,6 +70,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/jobs/inactivity': typeof ApiPublicJobsInactivityRoute
   '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRoutesById {
@@ -72,6 +80,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/api/public/chatwoot/webhook': typeof ApiPublicChatwootWebhookRoute
   '/api/public/evolution/webhook': typeof ApiPublicEvolutionWebhookRoute
+  '/api/public/jobs/inactivity': typeof ApiPublicJobsInactivityRoute
   '/api/public/ycloud/webhook': typeof ApiPublicYcloudWebhookRoute
 }
 export interface FileRouteTypes {
@@ -82,6 +91,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/public/chatwoot/webhook'
     | '/api/public/evolution/webhook'
+    | '/api/public/jobs/inactivity'
     | '/api/public/ycloud/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -90,6 +100,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/public/chatwoot/webhook'
     | '/api/public/evolution/webhook'
+    | '/api/public/jobs/inactivity'
     | '/api/public/ycloud/webhook'
   id:
     | '__root__'
@@ -98,6 +109,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/public/chatwoot/webhook'
     | '/api/public/evolution/webhook'
+    | '/api/public/jobs/inactivity'
     | '/api/public/ycloud/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -107,6 +119,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ApiPublicChatwootWebhookRoute: typeof ApiPublicChatwootWebhookRoute
   ApiPublicEvolutionWebhookRoute: typeof ApiPublicEvolutionWebhookRoute
+  ApiPublicJobsInactivityRoute: typeof ApiPublicJobsInactivityRoute
   ApiPublicYcloudWebhookRoute: typeof ApiPublicYcloudWebhookRoute
 }
 
@@ -147,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicEvolutionWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/inactivity': {
+      id: '/api/public/jobs/inactivity'
+      path: '/api/public/jobs/inactivity'
+      fullPath: '/api/public/jobs/inactivity'
+      preLoaderRoute: typeof ApiPublicJobsInactivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ycloud/webhook': {
       id: '/api/public/ycloud/webhook'
       path: '/api/public/ycloud/webhook'
@@ -163,6 +183,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ApiPublicChatwootWebhookRoute: ApiPublicChatwootWebhookRoute,
   ApiPublicEvolutionWebhookRoute: ApiPublicEvolutionWebhookRoute,
+  ApiPublicJobsInactivityRoute: ApiPublicJobsInactivityRoute,
   ApiPublicYcloudWebhookRoute: ApiPublicYcloudWebhookRoute,
 }
 export const routeTree = rootRouteImport
