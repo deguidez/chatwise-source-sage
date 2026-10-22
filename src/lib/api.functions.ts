@@ -4,6 +4,7 @@ import { z } from "zod";
 const auth = () => import("./auth.server");
 const store = () => import("./store.server");
 const guard = async () => (await auth()).requireAdmin();
+const guardSuper = async () => (await auth()).requireSuper();
 
 const mask = (v: string) => (v ? `••••${v.slice(-4)}` : "");
 
@@ -59,8 +60,37 @@ export const changePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const listUsers = createServerFn({ method: "GET" }).handler(async () => (await auth()).listUsers());
+
+export const createUser = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      username: z.string().min(3).max(30),
+      password: z.string().min(8).max(200),
+      role: z.enum(["super", "attendant"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await (await auth()).createUser(data.username, data.password, data.role);
+    return { ok: true };
+  });
+
+export const deleteUser = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30) }))
+  .handler(async ({ data }) => {
+    await (await auth()).deleteUser(data.username);
+    return { ok: true };
+  });
+
+export const resetUserPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(30), password: z.string().min(8).max(200) }))
+  .handler(async ({ data }) => {
+    await (await auth()).resetUserPassword(data.username, data.password);
+    return { ok: true };
+  });
+
 export const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
-  await guard();
+  await guardSuper();
   const s = await (await store()).getSettings();
   return {
     ...s,
@@ -108,7 +138,7 @@ const settingsSchema = z.object({
 export const saveSettings = createServerFn({ method: "POST" })
   .validator(settingsSchema)
   .handler(async ({ data }) => {
-    await guard();
+    await guardSuper();
     await (await store()).updateSettings((s) => {
       if ((data.handoffProvider ?? s.handoffProvider) !== "chatwoot" && !(data.attendantNumber ?? s.attendantNumber)) {
         throw new Error("Informe o WhatsApp do atendente para receber os avisos");
@@ -235,7 +265,7 @@ export const listConversations = createServerFn({ method: "GET" }).handler(async
   await guard();
   const c = await (await store()).getConversations();
   return Object.entries(c.chats)
-    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
+    .map(([jid, chat]) => ({ jid, name: chat.name, stage: chat.stage ?? "menu", companyId: chat.companyId ?? "", closed: chat.closed ?? false, inactivityReminderAt: chat.inactivityReminderAt ?? "", handoffProvider: chat.handoffProvider ?? "chatwoot", handoffNotificationError: chat.handoffNotificationError ?? "", ticketStatus: chat.ticketStatus ?? "", closedAt: chat.closedAt ?? "", handledBy: chat.handledBy ?? "", number: chat.number, channel: chat.channel, messages: chat.messages }))
     .sort((a, b) => (b.messages.at(-1)?.at ?? "").localeCompare(a.messages.at(-1)?.at ?? ""));
 });
 
@@ -288,14 +318,14 @@ export const sendAgentMessage = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await guard();
-    await (await agent()).agentSend(data.jid, data.text, data.media);
+    const me = await guard();
+    await (await agent()).agentSend(data.jid, data.text, data.media, me);
     return { ok: true };
   });
 
 export const assumeConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
-  await guard();
-  await (await agent()).assumeChat(data.jid);
+  const me = await guard();
+  await (await agent()).assumeChat(data.jid, me);
   return { ok: true };
 });
 
@@ -308,8 +338,8 @@ export const resolveConversation = createServerFn({ method: "POST" })
   });
 
 export const reopenConversation = createServerFn({ method: "POST" }).validator(jidSchema).handler(async ({ data }) => {
-  await guard();
-  await (await agent()).reopenChat(data.jid);
+  const me = await guard();
+  await (await agent()).assumeChat(data.jid, me);
   return { ok: true };
 });
 

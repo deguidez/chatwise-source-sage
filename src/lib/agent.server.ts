@@ -481,6 +481,7 @@ export async function closeByStaff(jid: string) {
     chat.closed = true;
     chat.ticketStatus = "resolved";
     chat.closedAt = now();
+    chat.handledBy = undefined;
     chat.handoffProvider = undefined;
     chat.handoffNotificationError = undefined;
     chat.inactivityReminderAt = undefined;
@@ -541,6 +542,7 @@ export async function returnToAI(jid: string) {
     ch.stage = "menu";
     ch.companyId = undefined;
     ch.ticketStatus = undefined;
+    ch.handledBy = undefined;
     ch.chatwootConversationId = undefined;
     ch.handoffProvider = undefined;
     ch.handoffNotificationError = undefined;
@@ -552,7 +554,7 @@ export async function returnToAI(jid: string) {
 const RESOLVED_MESSAGE = "Seu atendimento foi finalizado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem. 😊";
 
 /** Attendant takes the chat: the AI stops answering it. */
-export async function assumeChat(jid: string) {
+export async function assumeChat(jid: string, handledBy?: string) {
   await updateConversations((c) => {
     const ch = c.chats[jid];
     if (!ch) throw new Error("Conversa não encontrada");
@@ -561,15 +563,16 @@ export async function assumeChat(jid: string) {
     ch.closed = false;
     ch.ticketStatus = "open";
     ch.inactivityReminderAt = undefined;
+    if (handledBy) ch.handledBy = handledBy;
   });
 }
 
 /** Attendant sends a text and/or attachment from the app. */
-export async function agentSend(jid: string, text: string, media?: OutgoingMedia) {
+export async function agentSend(jid: string, text: string, media?: OutgoingMedia, handledBy?: string) {
   const s = await getSettings();
   const chat = (await getConversations()).chats[jid];
   if (!chat) throw new Error("Conversa não encontrada");
-  await assumeChat(jid);
+  await assumeChat(jid, handledBy);
   let stored: ChatMedia | undefined;
   if (media) {
     await sendWhatsAppMedia(s, chat.channel, chat.number, { ...media, caption: text || undefined });
@@ -602,6 +605,7 @@ export async function resolveChat(jid: string, notify = true) {
     ch.closed = true;
     ch.ticketStatus = "resolved";
     ch.closedAt = now();
+    ch.handledBy = undefined;
     ch.handoffProvider = undefined;
     ch.chatwootConversationId = undefined;
     ch.handoffNotificationError = undefined;

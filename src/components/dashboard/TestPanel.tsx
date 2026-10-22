@@ -17,8 +17,8 @@ export function TestPanel() {
   const companies = settings?.companies ?? [];
   const [companyId, setCompanyId] = useState("");
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const message = input.trim();
     if (!message) return;
     setInput("");
@@ -59,7 +59,17 @@ export function TestPanel() {
           {busy && <div className="text-sm text-muted-foreground">digitando...</div>}
         </div>
         <form onSubmit={send} className="flex gap-2 border-t bg-card p-3">
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Digite uma mensagem" />
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && input.trim()) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder="Digite uma mensagem"
+          />
           <Button type="submit" size="icon" disabled={busy}><Send className="h-4 w-4" /></Button>
         </form>
       </div>
