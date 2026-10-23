@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { chatwootIdFromInput as chatwootId } from "./agent-core";
 
 const auth = () => import("./auth.server");
 const store = () => import("./store.server");
