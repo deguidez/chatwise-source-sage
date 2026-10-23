@@ -377,10 +377,19 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       return "human-no-chatwoot";
     }
     const out = await reply("Certo! Vou transferir você para um dos nossos atendentes. Aguarde só um instante. 🙂");
-    const tmp = { ...chat, messages: [...chat.messages, userMsg, out] };
-    const conversationId = await openChatwootConversation(s, tmp, companyName);
-    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.ticketStatus = "queue"; c.handoffProvider = "chatwoot"; c.chatwootConversationId = conversationId; }, base);
-    return "transferred";
+    // Pause the AI durably before contacting Chatwoot, even if the Chatwoot call fails.
+    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "human"; c.ticketStatus = "queue"; c.handoffProvider = "chatwoot"; c.chatwootConversationId = undefined; c.handoffNotificationError = undefined; }, base);
+    try {
+      const tmp = { ...chat, messages: [...chat.messages, userMsg, out] };
+      const conversationId = await openChatwootConversation(s, tmp, companyName);
+      await saveChat(msg.jid, (c) => { c.chatwootConversationId = conversationId; }, base);
+      return "transferred";
+    } catch (error) {
+      await saveChat(msg.jid, (c) => {
+        c.handoffNotificationError = error instanceof Error ? error.message : "Falha ao abrir conversa no Chatwoot";
+      }, base);
+      return "chatwoot-failed";
+    }
   };
 
   if (route.kind === "human") return transfer();
