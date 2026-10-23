@@ -44,7 +44,8 @@ const preview = (c: Chat) => {
   const m = c.messages.at(-1);
   if (!m) return "";
   const media = m.media ? { image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 Arquivo", sticker: "Figurinha" }[m.media.kind] : "";
-  return [media, m.content].filter(Boolean).join(" ");
+  const text = m.content.replace(/[*_~`]/g, "").replace(/\s+/g, " ").trim();
+  return [media, text].filter(Boolean).join(" ");
 };
 
 function fileToBase64(file: Blob): Promise<string> {
@@ -188,7 +189,7 @@ export function ConversationsPanel() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {filtered.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma conversa aqui.</p>}
           {filtered.map((c) => (
-            <Button variant="ghost" key={c.jid} onClick={() => setSel(c.jid)} className={cn("grid h-auto w-full grid-cols-[40px_minmax(0,1fr)] items-start gap-3 whitespace-normal rounded-none border-b px-3 py-3 text-left hover:bg-muted", sel === c.jid && "bg-secondary")}>
+            <button type="button" key={c.jid} onClick={() => setSel(c.jid)} className={cn("grid w-full grid-cols-[40px_minmax(0,1fr)] items-start gap-3 border-b px-3 py-3 text-left hover:bg-muted", sel === c.jid && "bg-secondary")}>
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary">{displayName(c).replace("+", "").slice(0, 1).toUpperCase()}</div>
               <div className="min-w-0 flex-1">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -202,7 +203,7 @@ export function ConversationsPanel() {
                   {c.handledBy && <span className="max-w-full truncate rounded-full bg-secondary px-1.5 py-0.5 text-secondary-foreground">👤 {c.handledByName || c.handledBy}</span>}
                 </div>
               </div>
-            </Button>
+            </button>
           ))}
         </div>
       </div>
