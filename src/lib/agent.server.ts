@@ -308,7 +308,16 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }, base);
 
   if (route.kind === "silent") {
-    if (msg.text && chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
+    if (msg.text && chat.handoffProvider !== "whatsapp" && chat.chatwootConversationId && chatwootReady(s)) {
+      try {
+        await forwardToChatwoot(s, chat.chatwootConversationId, msg.text);
+      } catch (error) {
+        console.error("Encaminhamento ao Chatwoot falhou:", error);
+        await saveChat(msg.jid, (c) => {
+          c.handoffNotificationError = error instanceof Error ? error.message : "Falha ao encaminhar mensagem ao Chatwoot";
+        }, base);
+      }
+    }
     await saveChat(msg.jid, (c) => c.messages.push(userMsg), base);
     // Reassure the customer while waiting, at most once every 5 minutes.
     const lastNotice = [...chat.messages].reverse().find((m) => m.role === "assistant" && m.content === HUMAN_WAIT_MESSAGE);
