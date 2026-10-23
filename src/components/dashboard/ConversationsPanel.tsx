@@ -203,7 +203,7 @@ export function ConversationsPanel() {
                   {c.handledBy && <span className="max-w-full truncate rounded-full bg-secondary px-1.5 py-0.5 text-secondary-foreground">👤 {c.handledByName || c.handledBy}</span>}
                 </div>
               </div>
-            </Button>
+            </button>
           ))}
         </div>
       </div>
