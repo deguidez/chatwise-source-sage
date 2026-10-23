@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_CLOSING_MESSAGE } from "@/lib/agent-core";
 import { Field, Section, useSettingsForm } from "./SettingsPanel";
 
 export function CompaniesPanel() {
@@ -37,6 +38,11 @@ export function CompaniesPanel() {
         <div className="whitespace-pre-wrap rounded-lg bg-bubble-in p-4 text-sm shadow-sm ring-1 ring-border [overflow-wrap:anywhere]">{preview}</div>
       </Section>
 
+      <Section title="Mensagem de finalização padrão">
+        <Textarea rows={3} placeholder={DEFAULT_CLOSING_MESSAGE} value={f.closingMessage ?? ""} onChange={(e) => setF({ ...f, closingMessage: e.target.value })} />
+        <p className="text-sm text-muted-foreground">Enviada ao cliente quando o atendimento é resolvido. Usada pelas empresas sem mensagem própria.</p>
+      </Section>
+
       {companies.map((c, i) => (
         <Section key={c.id} title={`${i + 1} - ${c.name || "Nova empresa"}`}>
           <Field label="Nome">
@@ -44,6 +50,9 @@ export function CompaniesPanel() {
           </Field>
           <Field label="Instruções específicas desta empresa" hint="Tom de voz, regras, o que pode ou não falar.">
             <Textarea rows={4} value={c.prompt} onChange={(e) => setCompanies(companies.map((x) => (x.id === c.id ? { ...x, prompt: e.target.value } : x)))} />
+          </Field>
+          <Field label="Mensagem de finalização desta empresa" hint="Deixe vazio para usar a mensagem padrão.">
+            <Textarea rows={3} placeholder={f.closingMessage || DEFAULT_CLOSING_MESSAGE} value={c.closingMessage ?? ""} onChange={(e) => setCompanies(companies.map((x) => (x.id === c.id ? { ...x, closingMessage: e.target.value } : x)))} />
           </Field>
           {companies.length > 1 && (
             <Button variant="ghost" size="sm" onClick={() => setCompanies(companies.filter((x) => x.id !== c.id))}>

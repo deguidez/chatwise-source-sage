@@ -1,4 +1,4 @@
-import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, type IncomingMessage } from "./agent-core";
+import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, closingMessageFor, type IncomingMessage } from "./agent-core";
 import { aiFetch, captureMetric, whatsAppFetch, type AIContext } from "./metrics.server";
 import {
   getConversations,
@@ -577,7 +577,6 @@ export async function returnToAI(jid: string) {
 }
 
 // ---------------- Attendance from the app ----------------
-const RESOLVED_MESSAGE = "Seu atendimento foi finalizado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem. 😊";
 
 /** Attendant takes the chat: the AI stops answering it. */
 export async function assumeChat(jid: string, handledBy?: string) {
@@ -622,6 +621,7 @@ export async function resolveChat(jid: string, notify = true) {
   let snapshot: ChatState | undefined;
   const chat = (await getConversations()).chats[jid];
   if (!chat) throw new Error("Conversa não encontrada");
+  const RESOLVED_MESSAGE = closingMessageFor(s, chat.companyId);
   if (notify) await sendWhatsApp(s, chat.channel, chat.number, RESOLVED_MESSAGE).catch((e) => console.error("Aviso de finalização falhou:", e));
   await updateConversations((c) => {
     const ch = c.chats[jid];

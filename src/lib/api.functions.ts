@@ -129,9 +129,10 @@ const settingsSchema = z.object({
   chatwootToken: str(),
   chatwootInboxId: z.string().max(300).transform((v) => chatwootId(v)),
   greeting: str(2000),
+  closingMessage: str(2000),
   humanOption: z.boolean().optional(),
   companies: z
-    .array(z.object({ id: z.string().min(1).max(60), name: z.string().min(1).max(100), prompt: z.string().max(10000) }))
+    .array(z.object({ id: z.string().min(1).max(60), name: z.string().min(1).max(100), prompt: z.string().max(10000), closingMessage: z.string().max(2000).optional() }))
     .max(10)
     .optional(),
   openaiKey: z.string().max(500).optional(),
