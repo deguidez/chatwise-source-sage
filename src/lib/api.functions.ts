@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { chatwootIdFromInput as chatwootId } from "./agent-core";
 
 const auth = () => import("./auth.server");
 const store = () => import("./store.server");
@@ -124,9 +125,9 @@ const settingsSchema = z.object({
   handoffProvider: z.enum(["whatsapp", "other", "chatwoot"]).optional(),
   attendantNumber: z.string().max(30).transform((v) => v.replace(/\D/g, "")).refine((v) => !v || /^[1-9]\d{7,14}$/.test(v), "Informe o WhatsApp do atendente com DDI").optional(),
   chatwootUrl: str(),
-  chatwootAccountId: str(20),
+  chatwootAccountId: z.string().max(300).transform((v) => chatwootId(v)),
   chatwootToken: str(),
-  chatwootInboxId: str(20),
+  chatwootInboxId: z.string().max(300).transform((v) => chatwootId(v)),
   greeting: str(2000),
   humanOption: z.boolean().optional(),
   companies: z

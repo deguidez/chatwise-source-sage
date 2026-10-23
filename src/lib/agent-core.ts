@@ -283,3 +283,17 @@ export function fillQuickReply(text: string, name: string) {
 export function isStaffCloseCommand(text: string): boolean {
   return /\bencerr(ar|ando|o|ei)\b.{0,15}\batendimento\b/.test(norm(text));
 }
+
+/** Chatwoot ID from user input: accepts a plain number, a full URL or any pasted identifier. */
+export function chatwootIdFromInput(value: string): string {
+  const raw = value.trim();
+  if (!raw) return "";
+  const segments = raw.split("/").filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const digits = (segments[i] ?? "").replace(/\D/g, "");
+    if (digits) return digits;
+  }
+  if (raw.length <= 20) return raw;
+  const anyDigits = raw.replace(/\D/g, "");
+  return anyDigits || raw;
+}
