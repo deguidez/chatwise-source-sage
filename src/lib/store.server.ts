@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { isInactivityDue } from "./agent-core";
 import { metricDay, type MetricEvent } from "./metrics-core";
 
-export type Company = { id: string; name: string; prompt: string };
+export type Company = { id: string; name: string; prompt: string; closingMessage?: string | undefined };
 
 export type Settings = {
   aiProvider: "openai" | "gemini" | "ollama";
@@ -29,6 +29,7 @@ export type Settings = {
   webhookToken: string;
   systemPrompt: string;
   greeting: string;
+  closingMessage?: string | undefined;
   humanOption: boolean;
   companies: Company[];
   enabled: boolean;

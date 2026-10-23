@@ -297,3 +297,14 @@ export function chatwootIdFromInput(value: string): string {
   const anyDigits = raw.replace(/\D/g, "");
   return anyDigits || raw;
 }
+
+export const DEFAULT_CLOSING_MESSAGE = "Seu atendimento foi finalizado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem. 😊";
+
+/** Closing message: the company's own text, else the general one, else the default. */
+export function closingMessageFor(
+  settings: { closingMessage?: string | undefined; companies: { id: string; closingMessage?: string | undefined }[] },
+  companyId?: string,
+): string {
+  const own = settings.companies.find((c) => c.id === companyId)?.closingMessage?.trim();
+  return own || settings.closingMessage?.trim() || DEFAULT_CLOSING_MESSAGE;
+}

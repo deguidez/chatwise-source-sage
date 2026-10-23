@@ -59,3 +59,11 @@ describe("chatwootIdFromInput", () => {
     expect(chatwootIdFromInput("inbox-id-9876543210-xyz")).toBe("9876543210");
   });
 });
+
+import { closingMessageFor, DEFAULT_CLOSING_MESSAGE } from "@/lib/agent-core";
+describe("closingMessageFor", () => {
+  const companies = [{ id: "a", closingMessage: "Tchau da A" }, { id: "b", closingMessage: "" }];
+  it("usa a mensagem da empresa", () => expect(closingMessageFor({ closingMessage: "Geral", companies }, "a")).toBe("Tchau da A"));
+  it("empresa sem mensagem usa a geral", () => expect(closingMessageFor({ closingMessage: "Geral", companies }, "b")).toBe("Geral"));
+  it("sem nada usa o padrão", () => expect(closingMessageFor({ companies }, undefined)).toBe(DEFAULT_CLOSING_MESSAGE));
+});
