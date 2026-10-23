@@ -290,7 +290,7 @@ export function chatwootIdFromInput(value: string): string {
   if (!raw) return "";
   const segments = raw.split("/").filter(Boolean);
   for (let i = segments.length - 1; i >= 0; i--) {
-    const digits = segments[i].replace(/\D/g, "");
+    const digits = (segments[i] ?? "").replace(/\D/g, "");
     if (digits) return digits;
   }
   if (raw.length <= 20) return raw;
