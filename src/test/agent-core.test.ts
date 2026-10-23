@@ -45,3 +45,17 @@ describe("atendimento", () => {
     expect(m?.text).toBe("");
   });
 });
+
+import { chatwootIdFromInput } from "@/lib/agent-core";
+describe("chatwootIdFromInput", () => {
+  it("keeps a plain number", () => {
+    expect(chatwootIdFromInput("3")).toBe("3");
+  });
+  it("extracts the number from a full inbox URL", () => {
+    expect(chatwootIdFromInput("https://chat.exemplo.com/app/accounts/1/settings/inboxes/3")).toBe("3");
+    expect(chatwootIdFromInput("https://chat.exemplo.com/app/accounts/1/settings/inboxes/3/edit")).toBe("3");
+  });
+  it("returns digits from a long pasted identifier", () => {
+    expect(chatwootIdFromInput("inbox-id-9876543210-xyz")).toBe("9876543210");
+  });
+});

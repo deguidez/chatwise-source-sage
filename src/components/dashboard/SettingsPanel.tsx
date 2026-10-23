@@ -197,7 +197,7 @@ export function SettingsPanel() {
       <Section title="Chatwoot">
         <Field label="URL do Chatwoot" hint="Ex: https://chat.seudominio.com"><Input value={f.chatwootUrl} onChange={(e) => set("chatwootUrl", e.target.value)} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="ID da conta"><Input value={f.chatwootAccountId} onChange={(e) => set("chatwootAccountId", e.target.value)} /></Field>
+          <Field label="ID da conta" hint="Só o número (ex: 1) — ou cole a URL do Chatwoot."><Input value={f.chatwootAccountId} onChange={(e) => set("chatwootAccountId", e.target.value)} /></Field>
           <Field label="ID da caixa de entrada (API)" hint="Só o número (ex: 3) — ou cole a URL da caixa de entrada, o número é extraído automaticamente."><Input value={f.chatwootInboxId} onChange={(e) => set("chatwootInboxId", e.target.value)} /></Field>
         </div>
         <Field label="Token de acesso" hint="Chatwoot → Perfil → Token de acesso"><Input type="password" value={f.chatwootToken} onChange={(e) => set("chatwootToken", e.target.value)} /></Field>
