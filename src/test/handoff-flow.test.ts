@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/store.server", () => ({
   getSettings: async () => state.settings,
   getConversations: async () => structuredClone(state.conversations),
-  getKnowledge: async () => [],
+  getKnowledge: async () => state.knowledge,
   updateKnowledge: async (fn: (i: any[]) => any[]) => { state.knowledge = fn(state.knowledge ?? []); },
   updateConversations: async (fn: (c: Conversations) => void) => fn(state.conversations),
   claimInactivityReminder: async () => null,
@@ -25,6 +25,7 @@ const requestHandoff = async (text: string, id: string, channel: "evolution" | "
 };
 const fetchMock = vi.fn();
 beforeEach(() => {
+  state.knowledge = [];
   state.settings = { enabled: true, humanOption: true, replyGroups: false, greeting: "Oi", companies: [{ id: "a", name: "Associação Pace3", prompt: "" }], handoffProvider: "whatsapp", attendantNumber: "5511888880000", evolutionUrl: "https://evolution.example.test", evolutionKey: "test", evolutionInstance: "test", chatwootUrl: "https://chatwoot.example.test", chatwootAccountId: "1", chatwootInboxId: "2", chatwootToken: "test" } as Settings;
   state.conversations = { chats: { [jid]: { name: "Cliente teste", number: "5511999990000", channel: "evolution", stage: "company", companyId: "a", messages: [] } }, seenIds: [] };
   fetchMock.mockReset().mockImplementation(async () => new Response("{}"));
@@ -132,6 +133,48 @@ it("aprende automaticamente com as respostas do atendente ao encerrar", async ()
 
 
 describe("description before customer-requested handoff", () => {
+  it.each(["a", "e", undefined])("answers from eligible knowledge before transferring company %s", async (companyId) => {
+    state.settings.companies.push({ id: "e", name: "Pace3 Eventos Esportivos", prompt: "" });
+    state.settings.aiProvider = "openai";
+    state.settings.openaiKey = "test";
+    state.knowledge = [
+      { title: "Retirada", content: "Retirada de kit das 14h30 às 20h.", companyId: companyId ?? "" },
+      { title: "Outra empresa", content: "Informação exclusiva da outra empresa.", companyId: "outra" },
+    ];
+    const chat = state.conversations.chats[jid];
+    if (!chat) throw new Error("Missing test conversation");
+    chat.companyId = companyId;
+    chat.stage = companyId ? "company" : "menu";
+    fetchMock.mockImplementation(async (url: string) => url.includes("api.openai.com")
+      ? Response.json({ choices: [{ message: { content: "A retirada de kit é das 14h30 às 20h." } }] })
+      : Response.json({}));
+    await handleIncoming(incoming(companyId ? "atendente" : "3", "request"), "evolution");
+    expect(await handleIncoming(incoming("Qual o horário da retirada de kit?", "description"), "evolution")).toBe("replied");
+    expect(state.conversations.chats[jid]?.stage).toBe(companyId ? "company" : "menu");
+    expect(state.conversations.chats[jid]?.awaitingHandoffDescription).toBeUndefined();
+    expect(state.conversations.chats[jid]?.messages.at(-1)?.content).toBe("A retirada de kit é das 14h30 às 20h.");
+    const aiCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("api.openai.com"));
+    expect(aiCall).toBeDefined();
+    const prompt = JSON.parse(aiCall?.[1].body).messages[0].content;
+    expect(prompt).toContain("Retirada de kit das 14h30 às 20h.");
+    expect(prompt).not.toContain("Informação exclusiva da outra empresa.");
+    expect(fetchMock.mock.calls.filter((call) => JSON.parse(call[1].body).number === state.settings.attendantNumber)).toHaveLength(0);
+  });
+  it.each(["[TRANSFERIR]", "", "error"])("transfers with the existing description when knowledge cannot resolve it (%s)", async (answer) => {
+    state.settings.aiProvider = "openai";
+    state.settings.openaiKey = "test";
+    state.knowledge = [{ title: "Horário", content: "Retirada às 14h30.", companyId: "a" }];
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes("api.openai.com")) return answer === "error"
+        ? new Response("unavailable", { status: 503 })
+        : Response.json({ choices: [{ message: { content: answer } }] });
+      return Response.json({});
+    });
+    expect(await requestHandoff("atendente", "request")).toBe("transferred-whatsapp");
+    expect(state.conversations.chats[jid]?.stage).toBe("human");
+    expect(state.conversations.chats[jid]?.awaitingHandoffDescription).toBeUndefined();
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body).text).toContain("*Cliente:* Preciso alterar minha inscrição");
+  });
   it.each(["[TRANSFERIR]", ""])("asks before an automatic AI handoff (%s), then transfers after the description", async (answer) => {
     state.settings.aiProvider = "openai";
     state.settings.openaiKey = "test";

@@ -83,15 +83,20 @@ export async function generateReply(
   question: string,
   companyId?: string,
   source: "test" | "whatsapp" = "whatsapp",
+  beforeHandoff = false,
 ): Promise<string> {
   const company = settings.companies.find((c) => c.id === companyId);
   const knowledge = (await getKnowledge()).filter((k) => !k.companyId || k.companyId === companyId);
   const context = selectContext(knowledge, question);
+  // Without knowledge, do not invent an answer or delay the requested handoff.
+  if (beforeHandoff && !context.trim()) return TRANSFER_TOKEN;
   const system = [
     settings.systemPrompt,
     company ? `Você está atendendo em nome de: ${company.name}. Fale somente sobre essa empresa.` : "",
     company?.prompt ?? "",
-    `Se não souber a resposta ou o cliente estiver insatisfeito, responda somente ${TRANSFER_TOKEN}.`,
+    beforeHandoff
+      ? `O cliente descreveu sua dúvida antes do encaminhamento. Tente resolvê-la usando exclusivamente a base de conhecimento abaixo, mesmo que tenha pedido um atendente anteriormente. Não invente informações nem prometa ações que você não pode executar. Se a base não responder à dúvida por completo ou for necessária uma ação humana, responda somente ${TRANSFER_TOKEN}.`
+      : `Consulte primeiro a base de conhecimento e responda quando ela resolver a dúvida. Não invente informações. Se não souber a resposta ou for necessária uma ação humana, responda somente ${TRANSFER_TOKEN}.`,
     `=== BASE DE CONHECIMENTO ===\n${context || "(vazia)"}`,
   ]
     .filter(Boolean)
@@ -417,7 +422,29 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
 
   if (route.kind === "describe-handoff") return askHandoffDescription();
 
-  if (route.kind === "human") return transfer();
+  if (route.kind === "human") {
+    if (msg.text.trim()) {
+      let answer = "";
+      try {
+        answer = await generateReply(s, chat.messages, msg.text, chat.companyId, "whatsapp", true);
+      } catch (error) {
+        // Provider unavailability must not block the customer's handoff.
+        console.error("Consulta à base antes da transferência falhou:", error);
+      }
+      if (answer.trim() && !answer.includes(TRANSFER_TOKEN)) {
+        const out = await reply(answer, "ai");
+        await saveChat(msg.jid, (c) => {
+          c.messages.push(userMsg, out);
+          c.awaitingHandoffDescription = undefined;
+          c.stage = chat.companyId ? "company" : "menu";
+          c.companyId = chat.companyId;
+          c.ticketStatus = undefined;
+        }, base);
+        return "replied";
+      }
+    }
+    return transfer();
+  }
 
   if (route.kind === "menu") {
     const out = await reply(buildMenu(s.greeting, s.companies, s.humanOption));
