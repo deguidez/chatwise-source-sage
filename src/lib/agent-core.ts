@@ -175,6 +175,7 @@ export function parseYCloudWebhook(body: any): IncomingMessage | null {
 }
 
 export const TRANSFER_TOKEN = "[TRANSFERIR]";
+export const HANDOFF_DESCRIPTION_QUESTION = "Claro! Antes de encaminhar você para um atendente, descreva o que precisa para que ele possa te ajudar.";
 
 export const INACTIVITY_MS = 2 * 60 * 1000;
 export const INACTIVITY_QUESTION = "Você ainda está por aí? Quer cancelar o atendimento ou tem mais alguma dúvida? Para encerrar, responda cancelar.";
@@ -223,31 +224,36 @@ export type Route =
   | { kind: "menu" }
   | { kind: "select"; companyId: string }
   | { kind: "human" }
+  | { kind: "describe-handoff" }
   | { kind: "ai"; companyId: string }
   | { kind: "silent" };
 
 /** Decide what to do with an incoming message given the conversation state. */
 export function routeMessage(
-  state: { stage: "menu" | "company" | "human"; companyId?: string | undefined } | undefined,
+  state: { stage: "menu" | "company" | "human"; companyId?: string | undefined; awaitingHandoffDescription?: boolean | undefined } | undefined,
   text: string,
   companies: { id: string; name: string }[],
   humanOption: boolean,
 ): Route {
   if (state?.stage === "human") return { kind: "silent" };
   const t = norm(text).trim();
+  if (state?.awaitingHandoffDescription) {
+    if (t === "0" || t === "menu") return { kind: "menu" };
+    return t ? { kind: "human" } : { kind: "describe-handoff" };
+  }
   if (state?.stage === "company" && state.companyId && companies.some((c) => c.id === state.companyId)) {
     if (t === "0" || t === "menu") return { kind: "menu" };
-    if (wantsHuman(text)) return { kind: "human" };
+    if (wantsHuman(text)) return { kind: "describe-handoff" };
     return { kind: "ai", companyId: state.companyId };
   }
   // Menu stage: pick a company by number or name
   const n = Number(t.match(/^\d+/)?.[0]);
   const selected = companies[n - 1];
   if (n >= 1 && n <= companies.length && selected) return { kind: "select", companyId: selected.id };
-  if (humanOption && n === companies.length + 1) return { kind: "human" };
+  if (humanOption && n === companies.length + 1) return { kind: "describe-handoff" };
   const byName = companies.find((c) => t.includes(norm(c.name)));
   if (byName) return { kind: "select", companyId: byName.id };
-  if (wantsHuman(text)) return { kind: "human" };
+  if (wantsHuman(text)) return { kind: "describe-handoff" };
   return { kind: "menu" };
 }
 
