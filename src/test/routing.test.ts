@@ -14,10 +14,10 @@ describe("routeMessage", () => {
     expect(routeMessage({ stage: "menu" }, "2", companies, true)).toEqual({ kind: "select", companyId: "e" });
   });
   it("option 3 transfers to an attendant when enabled", () => {
-    expect(routeMessage({ stage: "menu" }, "3", companies, true)).toEqual({ kind: "human" });
+    expect(routeMessage({ stage: "menu" }, "3", companies, true)).toEqual({ kind: "describe-handoff" });
   });
   it("asking for an attendant inside a company transfers", () => {
-    expect(routeMessage({ stage: "company", companyId: "a" }, "quero falar com um atendente", companies, true)).toEqual({ kind: "human" });
+    expect(routeMessage({ stage: "company", companyId: "a" }, "quero falar com um atendente", companies, true)).toEqual({ kind: "describe-handoff" });
   });
   it("questions inside a company go to the AI of that company", () => {
     expect(routeMessage({ stage: "company", companyId: "a" }, "qual o valor?", companies, true)).toEqual({ kind: "ai", companyId: "a" });

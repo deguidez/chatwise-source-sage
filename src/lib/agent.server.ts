@@ -1,4 +1,4 @@
-import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, closingMessageFor, type IncomingMessage } from "./agent-core";
+import { buildMenu, routeMessage, selectContext, TRANSFER_TOKEN, HANDOFF_DESCRIPTION_QUESTION, INACTIVITY_QUESTION, isInactivityDue, isAutoCloseDue, AUTO_CLOSE_MESSAGE, wantsToCancel, closingMessageFor, type IncomingMessage } from "./agent-core";
 import { aiFetch, captureMetric, whatsAppFetch, type AIContext } from "./metrics.server";
 import {
   getConversations,
@@ -272,11 +272,12 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     chat.stage = "menu";
     chat.companyId = undefined;
     chat.ticketStatus = undefined;
+    chat.awaitingHandoffDescription = undefined;
   }
   const media = msg.media && channel === "evolution" ? await storeIncomingMedia(s, msg) : undefined;
   const userMsg: ChatMessage = { role: "user", content: msg.text || (msg.media ? "" : ""), at: now(), ...(media ? { media } : {}) };
   // Attachments without text cannot be read by the AI: keep them for the attendant.
-  if (!msg.text && chat.stage !== "human") {
+  if (!msg.text && chat.stage !== "human" && !chat.awaitingHandoffDescription) {
     await saveChat(msg.jid, (c) => { c.messages.push(userMsg); c.closed = false; c.ticketStatus = undefined; if (!c.name && msg.name) c.name = msg.name; }, { ...base, ...chat });
     return "media-stored";
   }
@@ -285,7 +286,9 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     return { role: "assistant" as const, content: text, at: now() };
   };
 
-  const route = routeMessage(chat, msg.text, s.companies, s.humanOption);
+  const route = chat.awaitingHandoffDescription && msg.media && !msg.text
+    ? { kind: "human" as const }
+    : routeMessage(chat, msg.text, s.companies, s.humanOption);
 
   // A cancellation answer belongs to the reminder, not to the company AI.
   if (chat.stage !== "human" && chat.inactivityReminderAt && wantsToCancel(msg.text)) {
@@ -296,6 +299,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
       c.stage = "menu";
       c.companyId = undefined;
       c.inactivityReminderAt = undefined;
+      c.awaitingHandoffDescription = undefined;
     }, base);
     return "cancelled";
   }
@@ -333,6 +337,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }
 
   const transfer = async (): Promise<string> => {
+    await saveChat(msg.jid, (c) => { c.awaitingHandoffDescription = undefined; }, base);
     const companyName = s.companies.find((c) => c.id === chat.companyId)?.name ?? "Sem empresa";
     const waTranscript = () =>
       [...chat.messages, userMsg].slice(-10).map((m) => `${m.role === "user" ? "*Cliente:*" : "*IA:*"} ${m.content}`).join("\n").slice(-3000);
@@ -401,11 +406,20 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     }
   };
 
+  if (route.kind === "describe-handoff") {
+    const out = await reply(HANDOFF_DESCRIPTION_QUESTION);
+    await saveChat(msg.jid, (c) => {
+      c.messages.push(userMsg, out);
+      c.awaitingHandoffDescription = true;
+    }, base);
+    return "awaiting-handoff-description";
+  }
+
   if (route.kind === "human") return transfer();
 
   if (route.kind === "menu") {
     const out = await reply(buildMenu(s.greeting, s.companies, s.humanOption));
-    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "menu"; c.companyId = undefined; }, base);
+    await saveChat(msg.jid, (c) => { c.messages.push(userMsg, out); c.stage = "menu"; c.companyId = undefined; c.awaitingHandoffDescription = undefined; }, base);
     return "menu";
   }
 

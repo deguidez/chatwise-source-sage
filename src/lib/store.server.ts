@@ -56,6 +56,7 @@ export type ChatState = {
   stage: "menu" | "company" | "human";
   companyId?: string | undefined;
   chatwootConversationId?: number | undefined;
+  awaitingHandoffDescription?: boolean | undefined;
   handoffProvider?: "whatsapp" | "other" | "chatwoot" | undefined;
   handoffNotificationError?: string | undefined;
   inactivityReminderAt?: string | undefined;
