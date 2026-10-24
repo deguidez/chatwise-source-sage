@@ -132,6 +132,22 @@ it("aprende automaticamente com as respostas do atendente ao encerrar", async ()
 
 
 describe("description before customer-requested handoff", () => {
+  it.each(["[TRANSFERIR]", ""])("asks before an automatic AI handoff (%s), then transfers after the description", async (answer) => {
+    state.settings.aiProvider = "openai";
+    state.settings.openaiKey = "test";
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes("api.openai.com")) return Response.json({ choices: [{ message: { content: answer } }] });
+      return Response.json({});
+    });
+    expect(await handleIncoming(incoming("Não consegui resolver minha inscrição", "ai-request"), "evolution")).toBe("awaiting-handoff-description");
+    expect(state.conversations.chats[jid]?.stage).toBe("company");
+    expect(state.conversations.chats[jid]?.awaitingHandoffDescription).toBe(true);
+    const notifications = fetchMock.mock.calls.filter((call) => JSON.parse(call[1].body).number === state.settings.attendantNumber);
+    expect(notifications).toHaveLength(0);
+    expect(await handleIncoming(incoming("Preciso corrigir meu nome na inscrição", "ai-description"), "evolution")).toBe("transferred-whatsapp");
+    expect(state.conversations.chats[jid]?.stage).toBe("human");
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body).text).toContain("*Cliente:* Preciso corrigir meu nome na inscrição");
+  });
   it.each(["a", "e", undefined])("waits for a description and preserves company %s", async (companyId) => {
     state.settings.companies.push({ id: "e", name: "Pace3 Eventos Esportivos", prompt: "" });
     const chat = state.conversations.chats[jid];

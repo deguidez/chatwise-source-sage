@@ -175,7 +175,7 @@ export function parseYCloudWebhook(body: any): IncomingMessage | null {
 }
 
 export const TRANSFER_TOKEN = "[TRANSFERIR]";
-export const HANDOFF_DESCRIPTION_QUESTION = "Claro! Antes de encaminhar você para um atendente, descreva o que precisa para que ele possa te ajudar.";
+export const HANDOFF_DESCRIPTION_QUESTION = "Antes de transferir você para um atendente, me conte: o que você está precisando ou qual é a sua dúvida?";
 
 export const INACTIVITY_MS = 2 * 60 * 1000;
 export const INACTIVITY_QUESTION = "Você ainda está por aí? Quer cancelar o atendimento ou tem mais alguma dúvida? Para encerrar, responda cancelar.";
