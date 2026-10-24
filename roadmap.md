@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Consultar a base da empresa após a descrição e responder antes de transferir, com testes de resposta e encaminhamento.
+- [x] Consultar a base da empresa após a descrição e responder antes de transferir, com testes de resposta e encaminhamento.
 
 - [x] Exigir descrição também nas transferências automáticas sugeridas pela IA, aguardando a resposta antes de avisar o atendente.
 
