@@ -406,14 +406,16 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
     }
   };
 
-  if (route.kind === "describe-handoff") {
+  const askHandoffDescription = async (): Promise<string> => {
     const out = await reply(HANDOFF_DESCRIPTION_QUESTION);
     await saveChat(msg.jid, (c) => {
       c.messages.push(userMsg, out);
       c.awaitingHandoffDescription = true;
     }, base);
     return "awaiting-handoff-description";
-  }
+  };
+
+  if (route.kind === "describe-handoff") return askHandoffDescription();
 
   if (route.kind === "human") return transfer();
 
@@ -432,7 +434,7 @@ export async function handleIncoming(msg: IncomingMessage, channel: ChatState["c
   }
 
   const answer = await generateReply(s, chat.messages, msg.text, route.companyId);
-  if (!answer || answer.includes(TRANSFER_TOKEN)) return transfer();
+  if (!answer || answer.includes(TRANSFER_TOKEN)) return askHandoffDescription();
   const out = await reply(answer, "ai");
   await saveChat(msg.jid, (c) => c.messages.push(userMsg, out), base);
   return "replied";
